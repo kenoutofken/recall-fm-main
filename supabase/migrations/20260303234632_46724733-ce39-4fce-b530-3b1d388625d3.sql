@@ -1,0 +1,1 @@
+ALTER TABLE public.memories ADD COLUMN people text[] NOT NULL DEFAULT '{}'::text[];
