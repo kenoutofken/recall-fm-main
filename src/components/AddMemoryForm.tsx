@@ -71,25 +71,43 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
       toast.error("Add a title first so AI knows what to create");
       return;
     }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      toast.error("Sign in again before generating a cover");
+      return;
+    }
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-cover", {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-cover`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           title,
           description,
           mood: selectedMoods.join(", "),
-        },
+        }),
       });
-      if (error) throw error;
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error || `Cover generation failed (${response.status})`);
+      }
       if (data?.imageUrl) {
         setImagePreview(data.imageUrl);
         setImageFile(null);
       } else if (data?.error) {
         toast.error(data.error);
+      } else {
+        toast.error("No image was returned");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to generate cover image");
+      const message = err instanceof Error ? err.message : "Failed to generate cover image";
+      toast.error(message);
     }
     setGenerating(false);
   };

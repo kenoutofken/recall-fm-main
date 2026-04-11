@@ -1,6 +1,7 @@
 import { Memory } from "@/types/memory";
 import { Calendar, Trash2, Pencil } from "lucide-react";
 import { format } from "date-fns";
+import MiniPlayer from "@/components/MiniPlayer";
 
 interface MemoryListItemProps {
   memory: Memory;
@@ -53,6 +54,10 @@ const MemoryListItem = ({ memory, onDelete, onEdit, onClick }: MemoryListItemPro
         >
           <Trash2 size={14} />
         </button>
+      </div>
+
+      <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+        <MiniPlayer songTitle={memory.songTitle} artist={memory.artist} variant="compact" />
       </div>
     </div>
   );

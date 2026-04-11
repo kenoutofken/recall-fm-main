@@ -1,5 +1,5 @@
 import { Memory } from "@/types/memory";
-import { Calendar, Trash2, Users, Pencil } from "lucide-react";
+import { Calendar, Trash2, Users, Pencil, Maximize2 } from "lucide-react";
 import MiniPlayer from "@/components/MiniPlayer";
 import { format } from "date-fns";
 
@@ -13,11 +13,17 @@ interface MemoryCardProps {
 
 const MemoryCard = ({ memory, onDelete, onEdit, onClick }: MemoryCardProps) => {
   return (
-    <div
-      className="group relative rounded-lg border border-border bg-card overflow-hidden transition-all hover:shadow-md cursor-pointer"
-      onClick={() => onClick?.(memory)}
-    >
-      <div className="absolute right-3 top-3 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="group relative rounded-lg border border-border bg-card overflow-hidden transition-all hover:shadow-md">
+      <div className="absolute right-3 top-3 z-10 flex gap-1">
+        {onClick && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onClick(memory); }}
+            className="text-muted-foreground hover:text-foreground bg-background/60 backdrop-blur-sm rounded-full p-1"
+            aria-label="Open memory"
+          >
+            <Maximize2 size={16} />
+          </button>
+        )}
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(memory); }}

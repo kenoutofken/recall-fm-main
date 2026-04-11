@@ -7,6 +7,7 @@ import UserAvatar from "@/components/UserAvatar";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { useMemories } from "@/hooks/useMemories";
 import { toast } from "sonner";
+import MiniPlayer from "@/components/MiniPlayer";
 
 const TUNEMYMUSIC_URL = "https://www.tunemymusic.com/";
 
@@ -106,6 +107,7 @@ const Playlist = () => {
                   >
                     <Trash2 size={14} />
                   </button>
+                  <MiniPlayer songTitle={song.songTitle} artist={song.artist} variant="compact" />
                 </div>
               ))}
             </div>

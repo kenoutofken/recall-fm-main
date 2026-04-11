@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -31,10 +31,8 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const anonClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: userError } = await anonClient.auth.getUser();
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -52,16 +50,20 @@ serve(async (req) => {
 
     const prompt = `Create a beautiful, atmospheric, artistic cover image for a music memory journal entry. The memory is titled "${title}"${description ? `, described as: "${description.slice(0, 200)}"` : ""}${mood ? `, with the mood: ${mood}` : ""}. Make it evocative and dreamy, like an album cover. No text, no words, no borders, no frames, no margins in the image. The image must be full-bleed edge-to-edge with no visible border or padding. Soft lighting, cinematic feel.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
+        model: "gpt-image-1-mini",
+        prompt,
+        size: "1024x1024",
+        quality: "low",
+        output_format: "jpeg",
+        output_compression: 60,
+        user: user.id,
       }),
     });
 
@@ -74,32 +76,37 @@ serve(async (req) => {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (status === 401) {
+        return new Response(JSON.stringify({ error: "OpenAI API key is invalid or missing." }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI gateway error: ${status}`);
+      if (status === 402 || status === 403) {
+        return new Response(JSON.stringify({ error: "OpenAI billing or permissions are not configured." }), {
+          status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`OpenAI image generation error: ${status}`);
     }
 
     const aiData = await aiResponse.json();
-    const base64Url = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!base64Url) {
+    const base64Image = aiData.data?.[0]?.b64_json;
+    if (!base64Image) {
       throw new Error("No image returned from AI");
     }
 
     // Decode base64 and upload to storage
-    const base64Data = base64Url.split(",")[1];
+    const base64Data = base64Image.includes(",") ? base64Image.split(",")[1] : base64Image;
     const binaryStr = atob(base64Data);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
 
-    const fileName = `${user.id}/ai-${Date.now()}.png`;
+    const fileName = `${user.id}/ai-${Date.now()}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from("memory-images")
-      .upload(fileName, bytes, { contentType: "image/png" });
+      .upload(fileName, bytes, { contentType: "image/jpeg" });
 
     if (uploadError) {
       console.error("Upload error:", uploadError);

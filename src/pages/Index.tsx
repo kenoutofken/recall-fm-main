@@ -3,16 +3,14 @@ import { useState, useMemo, useCallback } from "react";
 import { Search, SlidersHorizontal, X, LayoutGrid, List } from "lucide-react";
 import { useMemories } from "@/hooks/useMemories";
 
-import { Memory, MOODS, MEMORY_TYPES } from "@/types/memory";
+import { Memory } from "@/types/memory";
 import Timeline, { ViewMode } from "@/components/Timeline";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
-import TimePeriodPicker from "@/components/TimePeriodPicker";
+import FilterDrawer from "@/components/FilterDrawer";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion";
 import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -110,8 +108,8 @@ const Index = () => {
 
       <main className="max-w-lg mx-auto px-4 py-6 pb-24">
         <p className="text-sm text-muted-foreground mb-4">Your personal collection of song-linked memories.</p>
-        <div className="mb-4 space-y-3">
-          <div className="relative">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search your memories…"
@@ -125,83 +123,19 @@ const Index = () => {
               </button>
             )}
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={showFilters ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="gap-1.5"
-            >
-              <SlidersHorizontal size={14} />
-              Filters
-              {(selectedMoods.length + selectedTags.length) > 0 && (
-                <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                  {selectedMoods.length + selectedTags.length}
-                </span>
-              )}
-            </Button>
-
-            <TimePeriodPicker dateFilter={dateFilter} onDateFilterChange={setDateFilter} />
-
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-auto">
-                Clear all
-              </button>
+          <Button
+            variant={showFilters ? "secondary" : "outline"}
+            size="icon"
+            onClick={() => setShowFilters(true)}
+            className="relative shrink-0"
+          >
+            <SlidersHorizontal size={16} />
+            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0)) > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
+                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0)}
+              </span>
             )}
-          </div>
-
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Mood</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {MOODS.map((mood) => {
-                        const label = `${mood.emoji} ${mood.label}`;
-                        const active = selectedMoods.includes(label);
-                        return (
-                          <Badge
-                            key={mood.label}
-                            variant={active ? "default" : "outline"}
-                            className={cn("cursor-pointer transition-colors text-xs", active && "bg-primary text-primary-foreground")}
-                            onClick={() => toggleMood(label)}
-                          >
-                            {mood.emoji} {mood.label}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Memory Type</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {MEMORY_TYPES.map((tag) => {
-                        const active = selectedTags.includes(tag);
-                        return (
-                          <Badge
-                            key={tag}
-                            variant={active ? "default" : "outline"}
-                            className={cn("cursor-pointer transition-colors text-xs", active && "bg-primary text-primary-foreground")}
-                            onClick={() => toggleTag(tag)}
-                          >
-                            {tag}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          </Button>
         </div>
 
         {loading ? (
@@ -234,22 +168,24 @@ const Index = () => {
                 <button
                   onClick={() => setViewMode("cards")}
                   className={cn(
-                    "p-1.5 rounded transition-colors",
+                    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-label="Card view"
                 >
                   <LayoutGrid size={14} />
+                  <span>Cards</span>
                 </button>
                 <button
                   onClick={() => setViewMode("list")}
                   className={cn(
-                    "p-1.5 rounded transition-colors",
+                    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-label="List view"
                 >
                   <List size={14} />
+                  <span>List</span>
                 </button>
               </div>
             </div>
@@ -269,6 +205,20 @@ const Index = () => {
       </main>
 
       <BottomNav onNewMemory={() => setShowForm(true)} />
+
+      <FilterDrawer
+        open={showFilters}
+        onOpenChange={setShowFilters}
+        selectedMoods={selectedMoods}
+        selectedTags={selectedTags}
+        dateFilter={dateFilter}
+        searchQuery={searchQuery}
+        onToggleMood={toggleMood}
+        onToggleTag={toggleTag}
+        onDateFilterChange={setDateFilter}
+        onClearFilters={clearFilters}
+        onSearchChange={setSearchQuery}
+      />
 
       {showForm && (
         <AddMemoryForm

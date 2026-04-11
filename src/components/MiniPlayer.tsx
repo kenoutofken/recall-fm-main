@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 import { Play, Pause, Volume2, VolumeX, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,7 @@ interface MiniPlayerProps {
   songTitle: string;
   artist: string;
   autoPlay?: boolean;
-  variant?: "default" | "overlay";
+  variant?: "default" | "overlay" | "compact";
 }
 
 interface DeezerTrack {
@@ -21,6 +21,8 @@ interface DeezerTrack {
 
 const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }: MiniPlayerProps) => {
   const isOverlay = variant === "overlay";
+  const isCompact = variant === "compact";
+  const playerId = useId();
   const [track, setTrack] = useState<DeezerTrack | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -29,6 +31,8 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
   const [muted, setMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animRef = useRef<number>(0);
+  const autoStartedRef = useRef(false);
+  const userPausedAutoRef = useRef(false);
 
   const searchTrack = useCallback(async () => {
     if (searched) return;
@@ -52,27 +56,62 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
     searchTrack();
   }, [searchTrack]);
 
-  // Auto-play when active, stop when not
-  useEffect(() => {
-    if (autoPlay && track && audioRef.current && !playing) {
-      audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
-    }
-    if (!autoPlay && audioRef.current && playing) {
+  const stopPlayback = useCallback(() => {
+    if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      setPlaying(false);
-      setProgress(0);
     }
-  }, [autoPlay, track]);
+    autoStartedRef.current = false;
+    setPlaying(false);
+    setProgress(0);
+  }, []);
+
+  const startPlayback = useCallback((startedByAutoPlay = false) => {
+    if (!audioRef.current || !track) return;
+    autoStartedRef.current = startedByAutoPlay;
+    window.dispatchEvent(new CustomEvent("recallfm:preview-play", { detail: { playerId } }));
+    audioRef.current.play().then(() => setPlaying(true)).catch(() => {
+      if (startedByAutoPlay) autoStartedRef.current = false;
+    });
+  }, [playerId, track]);
+
+  // Auto-play when active, stop when not
+  useEffect(() => {
+    if (autoPlay && track && audioRef.current && !playing && !userPausedAutoRef.current) {
+      startPlayback(true);
+    }
+    if (!autoPlay) {
+      userPausedAutoRef.current = false;
+    }
+    if (!autoPlay && (autoStartedRef.current || isOverlay) && audioRef.current && playing) {
+      stopPlayback();
+    }
+  }, [autoPlay, track, playing, startPlayback, stopPlayback, isOverlay]);
+
+  useEffect(() => {
+    userPausedAutoRef.current = false;
+  }, [track?.preview]);
+
+  useEffect(() => {
+    const handlePreviewPlay = (event: Event) => {
+      const otherPlayerId = (event as CustomEvent<{ playerId: string }>).detail?.playerId;
+      if (otherPlayerId && otherPlayerId !== playerId) stopPlayback();
+    };
+
+    window.addEventListener("recallfm:preview-play", handlePreviewPlay);
+    return () => window.removeEventListener("recallfm:preview-play", handlePreviewPlay);
+  }, [playerId, stopPlayback]);
 
   const togglePlay = () => {
     if (!audioRef.current || !track) return;
     if (playing) {
       audioRef.current.pause();
+      autoStartedRef.current = false;
+      if (autoPlay) userPausedAutoRef.current = true;
       setPlaying(false);
     } else {
-      audioRef.current.play();
-      setPlaying(true);
+      userPausedAutoRef.current = false;
+      startPlayback();
     }
   };
 
@@ -94,6 +133,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
   }, [playing, updateProgress]);
 
   const handleEnded = () => {
+    autoStartedRef.current = false;
     setPlaying(false);
     setProgress(0);
   };
@@ -107,6 +147,19 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
   };
 
   if (loading) {
+    if (isCompact) {
+      return (
+        <button
+          type="button"
+          disabled
+          className="h-8 w-8 rounded-full flex items-center justify-center bg-muted text-muted-foreground"
+          aria-label="Finding preview"
+        >
+          <Loader2 size={14} className="animate-spin" />
+        </button>
+      );
+    }
+
     return (
       <div className={cn("flex items-center gap-2 rounded-md px-3 py-2", isOverlay ? "bg-black/50 backdrop-blur-sm" : "bg-muted")}>
         <Loader2 size={14} className={cn("animate-spin", isOverlay ? "text-white" : "text-primary")} />
@@ -116,10 +169,45 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
   }
 
   if (!track) {
+    if (isCompact) {
+      return (
+        <button
+          type="button"
+          disabled
+          className="h-8 w-8 rounded-full flex items-center justify-center bg-muted text-muted-foreground opacity-60"
+          aria-label="No preview available"
+        >
+          <Play size={14} className="ml-0.5" />
+        </button>
+      );
+    }
+
     return (
       <div className={cn("flex items-center gap-2 rounded-md px-3 py-2", isOverlay ? "bg-black/50 backdrop-blur-sm" : "bg-muted")}>
         <span className={cn("text-xs", isOverlay ? "text-white/70" : "text-muted-foreground")}>No preview available</span>
       </div>
+    );
+  }
+
+  if (isCompact) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="h-8 w-8 rounded-full flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          aria-label={playing ? "Pause preview" : "Play preview"}
+        >
+          {playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+        </button>
+        <audio
+          ref={audioRef}
+          src={track.preview}
+          muted={muted}
+          onEnded={handleEnded}
+          preload="none"
+        />
+      </>
     );
   }
 

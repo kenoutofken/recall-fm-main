@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemories } from "@/hooks/useMemories";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { Memory, MOODS, MEMORY_TYPES } from "@/types/memory";
-import { Calendar, SlidersHorizontal, X, Search, Heart, Bookmark, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Calendar, SlidersHorizontal, X, Search, Heart, Bookmark, ChevronLeft, ChevronRight, Sparkles, Maximize2 } from "lucide-react";
 import AISuggestDrawer from "@/components/AISuggestDrawer";
 import FilterDrawer from "@/components/FilterDrawer";
 import { useLikes } from "@/hooks/useLikes";
@@ -280,7 +280,7 @@ const Discover = () => {
                   <motion.div
                     key={mem.id}
                     className={cn(
-                      "shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full",
+                      "shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full flex flex-col gap-2",
                       i === currentIndex ? "opacity-100" : "opacity-40"
                     )}
                     drag="x"
@@ -289,33 +289,22 @@ const Discover = () => {
                     onDragEnd={handleDragEnd}
                   >
                     <div
-                      className="rounded-lg border border-border bg-card overflow-hidden grid h-full cursor-pointer relative"
+                      className="rounded-lg border border-border bg-card overflow-hidden grid flex-1 min-h-0 relative"
                       style={{ gridTemplateRows: "1fr auto" }}
-                      onClick={() => setExpandedMemory(mem)}
                     >
                       <div className={cn("w-full overflow-hidden min-h-0 relative", !mem.imageUrl && getMoodGradient(mem.mood))}>
                         {mem.imageUrl && <img src={mem.imageUrl} alt="" className="size-full object-cover" />}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setExpandedMemory(mem); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="absolute right-2 top-2 z-20 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                          aria-label="Open memory"
+                        >
+                          <Maximize2 size={18} />
+                        </button>
                         <div className="absolute bottom-0 left-0 right-0 p-3" onClick={(e) => e.stopPropagation()}>
                           <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} autoPlay={i === currentIndex} variant="overlay" />
                         </div>
-                        {i === currentIndex && (
-                          <>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); goPrev(); }}
-                              disabled={currentIndex === 0}
-                              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-0 transition-all"
-                            >
-                              <ChevronLeft size={18} />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); goNext(); }}
-                              disabled={currentIndex >= filtered.length - 1}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-0 transition-all"
-                            >
-                              <ChevronRight size={18} />
-                            </button>
-                          </>
-                        )}
                       </div>
                       <div className="px-5 py-4 flex flex-col">
                         <h3 className="font-display text-lg font-semibold leading-snug mb-2 text-foreground shrink-0">
@@ -355,11 +344,11 @@ const Discover = () => {
                                     );
                                     if (song) {
                                       removeSong(song.id);
-                                      toast.success("Removed from your list");
+                                      toast.success("Removed from your playlist");
                                     }
                                   } else {
                                     addSong(mem.songTitle, mem.artist, mem.id);
-                                    toast.success("Added to your list!");
+                                    toast.success("Added to your playlist!");
                                   }
                                 }}
                                 className={cn(
@@ -376,6 +365,28 @@ const Discover = () => {
                         </div>
                       </div>
                     </div>
+                    {i === currentIndex && (
+                      <div className="grid grid-cols-2 gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          disabled={currentIndex === 0}
+                          className="h-11 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-card flex items-center justify-center gap-2"
+                        >
+                          <ChevronLeft size={18} />
+                          Previous
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); goNext(); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          disabled={currentIndex >= filtered.length - 1}
+                          className="h-11 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-card flex items-center justify-center gap-2"
+                        >
+                          Next
+                          <ChevronRight size={18} />
+                        </button>
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -440,11 +451,11 @@ const Discover = () => {
                         );
                         if (song) {
                           removeSong(song.id);
-                          toast.success("Removed from your list");
+                          toast.success("Removed from your playlist");
                         }
                       } else {
                         addSong(expandedMemory.songTitle, expandedMemory.artist, expandedMemory.id);
-                        toast.success("Added to your list!");
+                        toast.success("Added to your playlist!");
                       }
                     }}
                     className={cn(
