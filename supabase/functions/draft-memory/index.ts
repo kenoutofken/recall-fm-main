@@ -7,6 +7,7 @@ const corsHeaders = {
 
 const allowedMoods = ["Joyful", "Melancholy", "Nostalgic", "Peaceful", "Energized", "Bittersweet"];
 const allowedTags = ["Family", "Friends", "Travel", "Holiday", "Adventure", "Relationship", "Solo", "Work"];
+const allowedSeasons = ["Winter", "Spring", "Summer", "Fall"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -35,7 +36,9 @@ Return only JSON with this exact shape:
     "description": "warm first-person memory description, 1-4 sentences",
     "songTitle": "song title if mentioned or inferable, otherwise empty string",
     "artist": "artist if mentioned or inferable, otherwise empty string",
-    "date": "YYYY-MM-DD if clearly stated, otherwise empty string",
+    "memoryYear": "number if known, otherwise null",
+    "memorySeason": "one of: ${allowedSeasons.join(", ")}, otherwise empty string",
+    "locationName": "city, venue, park, home, or place if mentioned or inferable, otherwise empty string",
     "moods": ["one or more of: ${allowedMoods.join(", ")}"],
     "people": ["names or relationship labels mentioned in the notes"],
     "tags": ["one or more of: ${allowedTags.join(", ")}"]
@@ -44,9 +47,15 @@ Return only JSON with this exact shape:
 
 Rules:
 - Do not invent a song or artist if the notes do not strongly imply one.
-- Do not invent an exact date unless the user gave one.
+- Prefer a rough timeline over an exact date.
+- Only return memoryYear if a year is clearly stated or strongly implied.
+- Only return memorySeason if a season is clearly stated or strongly implied.
+- Only return locationName if a place is mentioned or strongly implied.
+- If the user gives a month, infer the season from that month.
+- If the user gives an exact date, convert it into memoryYear and memorySeason instead of returning the exact date.
 - Keep tags limited to the allowed tag list.
 - Keep moods limited to the allowed mood list.
+- Keep memorySeason limited to the allowed season list.
 - Preserve the user's meaning without adding dramatic details.
 
 User notes:

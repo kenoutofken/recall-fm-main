@@ -1,7 +1,7 @@
 import { Memory } from "@/types/memory";
-import { Calendar, Users, Pencil, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar, Users, Pencil, Trash2, MapPin } from "lucide-react";
 import MiniPlayer from "@/components/MiniPlayer";
+import { formatMemoryTime } from "@/lib/memoryTime";
 import {
   Dialog,
   DialogContent,
@@ -25,15 +25,15 @@ const MemoryDetailModal = ({ memory, open, onOpenChange, onDelete, onEdit }: Mem
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] min-w-0 overflow-hidden p-0 sm:max-w-md [&>button]:z-50 [&>button]:flex [&>button]:h-9 [&>button]:w-9 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full [&>button]:bg-black/55 [&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:ring-offset-0 [&>button]:transition-colors [&>button:hover]:bg-black/70">
         {memory.imageUrl && (
           <img src={memory.imageUrl} alt="" className="w-full h-48 object-cover" />
         )}
-        <div className="p-5 space-y-4">
-          <DialogHeader className="space-y-1">
-            <DialogTitle className="font-display text-lg leading-snug">{memory.title}</DialogTitle>
+        <div className="min-w-0 p-5 space-y-4">
+          <DialogHeader className="min-w-0 space-y-1">
+            <DialogTitle className="min-w-0 break-words font-display text-lg leading-snug">{memory.title}</DialogTitle>
             {memory.description && (
-              <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
+              <DialogDescription className="min-w-0 break-words text-sm text-muted-foreground leading-relaxed">
                 {memory.description}
               </DialogDescription>
             )}
@@ -61,7 +61,9 @@ const MemoryDetailModal = ({ memory, open, onOpenChange, onDelete, onEdit }: Mem
             </div>
           )}
 
-          <MiniPlayer songTitle={memory.songTitle} artist={memory.artist} />
+          <div className="min-w-0 max-w-full overflow-hidden">
+            <MiniPlayer songTitle={memory.songTitle} artist={memory.artist} />
+          </div>
 
           {memory.people.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -74,10 +76,17 @@ const MemoryDetailModal = ({ memory, open, onOpenChange, onDelete, onEdit }: Mem
             </div>
           )}
 
+          {memory.locationName && (
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin size={12} className="shrink-0" />
+              <span className="min-w-0 break-words">{memory.locationName}</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Calendar size={12} />
-              <span>{format(new Date(memory.date), "MMM d, yyyy")}</span>
+              <span>{formatMemoryTime(memory)}</span>
             </div>
             <div className="flex gap-1">
               {onEdit && (

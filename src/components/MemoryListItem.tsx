@@ -1,7 +1,7 @@
 import { Memory } from "@/types/memory";
-import { Calendar, Trash2, Pencil } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar, Trash2, Pencil, MapPin } from "lucide-react";
 import MiniPlayer from "@/components/MiniPlayer";
+import { formatMemoryTime } from "@/lib/memoryTime";
 
 interface MemoryListItemProps {
   memory: Memory;
@@ -28,12 +28,18 @@ const MemoryListItem = ({ memory, onDelete, onEdit, onClick }: MemoryListItemPro
         <p className="text-xs text-muted-foreground truncate">
           {memory.songTitle} — {memory.artist}
         </p>
+        {memory.locationName && (
+          <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <MapPin size={10} className="shrink-0" />
+            <span className="min-w-0 truncate">{memory.locationName}</span>
+          </p>
+        )}
       </div>
 
       {/* Date */}
       <div className="hidden xs:flex items-center gap-1 text-xs text-muted-foreground shrink-0">
         <Calendar size={11} />
-        <span>{format(new Date(memory.date), "MMM d")}</span>
+        <span>{formatMemoryTime(memory)}</span>
       </div>
 
       {/* Actions */}

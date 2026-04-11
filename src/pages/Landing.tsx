@@ -5,21 +5,21 @@ import { cn } from "@/lib/utils";
 const slides = [
   {
     icon: "🎵",
-    title: "Capture Your Memories",
+    title: "Every Song Holds a Moment",
     description:
-      "Save special moments and connect them with the songs that made them unforgettable",
+      "Save the tracks that carry you back to the people, places, and feelings you never want to lose.",
   },
   {
     icon: "📖",
-    title: "Tell Your Story",
+    title: "The People Inside the Music",
     description:
-      "Each memory is a chapter. Write the feelings, the people, and the soundtrack of your life.",
+      "Share the songs tied to the friends, family, loves, and seasons that shaped you.",
   },
   {
     icon: "🔍",
-    title: "Rediscover Your Past",
+    title: "Find What Moves Others",
     description:
-      "Search by mood, song, or people. Relive your favorite moments whenever you want.",
+      "Discover memories through music, hear the tracks behind them, and find something new to carry with you.",
   },
 ];
 

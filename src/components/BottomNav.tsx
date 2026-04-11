@@ -1,4 +1,4 @@
-import { BookOpen, BookOpenText, Compass, Plus, Map } from "lucide-react";
+import { BookOpen, Compass, Plus } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 
@@ -9,25 +9,26 @@ interface BottomNavProps {
 const BottomNav = ({ onNewMemory }: BottomNavProps) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-t border-border">
-      <div className="max-w-lg mx-auto grid grid-cols-3 items-center py-2 px-4">
+      <div className="max-w-lg mx-auto grid grid-cols-3 items-center px-4 pb-2 pt-0">
         <NavLink
-          to="/journal"
-          className="flex flex-col items-center gap-1 px-3 py-2 text-muted-foreground transition-all"
+          to="/"
+          end
+          className="relative flex flex-col items-center gap-1 px-3 pb-2 pt-3 text-muted-foreground transition-colors"
           activeClassName="text-primary font-semibold"
         >
           {({ isActive }) => (
             <>
-              <div className={cn(
-                "p-2 rounded-xl transition-all",
-                isActive && "bg-primary/20"
-              )}>
-                {isActive ? (
-                  <BookOpenText size={22} strokeWidth={2.5} />
-                ) : (
-                  <BookOpen size={22} />
-                )}
+              <span className={cn(
+                "absolute left-1/2 top-0 h-0.5 w-12 -translate-x-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                isActive && "opacity-100"
+              )} />
+              <div className="p-2 transition-colors">
+                <Compass
+                  size={23}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
               </div>
-              <span className="text-[11px]">Journal</span>
+              <span className="text-[11px]">Discover</span>
             </>
           )}
         </NavLink>
@@ -42,24 +43,23 @@ const BottomNav = ({ onNewMemory }: BottomNavProps) => {
         </div>
 
         <NavLink
-          to="/"
-          end
-          className="flex flex-col items-center gap-1 px-3 py-2 text-muted-foreground transition-all"
+          to="/journal"
+          className="relative flex flex-col items-center gap-1 px-3 pb-2 pt-3 text-muted-foreground transition-colors"
           activeClassName="text-primary font-semibold"
         >
           {({ isActive }) => (
             <>
-              <div className={cn(
-                "p-2 rounded-xl transition-all",
-                isActive && "bg-primary/20"
-              )}>
-                {isActive ? (
-                  <Map size={22} strokeWidth={2.5} />
-                ) : (
-                  <Compass size={22} />
-                )}
+              <span className={cn(
+                "absolute left-1/2 top-0 h-0.5 w-12 -translate-x-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                isActive && "opacity-100"
+              )} />
+              <div className="p-2 transition-colors">
+                <BookOpen
+                  size={23}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
               </div>
-              <span className="text-[11px]">Discover</span>
+              <span className="text-[11px]">Journal</span>
             </>
           )}
         </NavLink>

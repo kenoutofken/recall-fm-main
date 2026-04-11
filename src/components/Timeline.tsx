@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
-import { format, parse } from "date-fns";
 import { motion } from "framer-motion";
 import { Memory } from "@/types/memory";
 import MemoryCard from "@/components/MemoryCard";
 import MemoryListItem from "@/components/MemoryListItem";
 import MemoryDetailModal from "@/components/MemoryDetailModal";
 import { Button } from "@/components/ui/button";
+import { formatMemoryTime, seasonFromDate, yearFromDate } from "@/lib/memoryTime";
 
 const ITEMS_PER_PAGE = 10;
 
-export type ViewMode = "cards" | "list";
+export type ViewMode = "cards" | "list" | "map";
 
 interface TimelineProps {
   memories: Memory[];
@@ -29,15 +29,16 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
   const grouped = useMemo(() => {
     const map = new Map<string, Memory[]>();
     sorted.forEach((m) => {
-      const key = format(new Date(m.date), "yyyy-MM");
+      const year = m.memoryYear ?? yearFromDate(m.date);
+      const season = m.memorySeason ?? seasonFromDate(m.date);
+      const key = `${year}-${season}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(m);
     });
-    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
+    return Array.from(map.entries()).sort(([, aItems], [, bItems]) => {
+      return new Date(bItems[0].date).getTime() - new Date(aItems[0].date).getTime();
+    });
   }, [sorted]);
-
-  const formatMonthLabel = (ym: string) =>
-    format(parse(ym, "yyyy-MM", new Date()), "MMMM yyyy");
 
   const getVisibleCount = (monthKey: string, total: number) => {
     const extra = expandedMonths[monthKey] ?? 0;
@@ -70,12 +71,10 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
               <div key={monthKey} className="mb-8">
                 <div className="relative flex items-center gap-3 mb-4">
                   <div className="relative z-10 h-[30px] w-[30px] rounded-full bg-primary flex items-center justify-center">
-                    <span className="text-xs font-bold text-primary-foreground">
-                      {format(parse(monthKey, "yyyy-MM", new Date()), "MMM")[0]}
-                    </span>
+                    <span className="text-xs font-bold text-primary-foreground">{formatMemoryTime(items[0])[0]}</span>
                   </div>
                   <h2 className="font-display text-base font-semibold text-foreground">
-                    {formatMonthLabel(monthKey)}
+                    {formatMemoryTime(items[0])}
                     {items.length > ITEMS_PER_PAGE && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         ({items.length})

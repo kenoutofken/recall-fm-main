@@ -1,11 +1,12 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 
-import { Search, SlidersHorizontal, X, LayoutGrid, List } from "lucide-react";
+import { Search, SlidersHorizontal, X, LayoutGrid, List, Map } from "lucide-react";
 import { useMemories } from "@/hooks/useMemories";
 
 import { Memory } from "@/types/memory";
 import Timeline, { ViewMode } from "@/components/Timeline";
 import AddMemoryForm from "@/components/AddMemoryForm";
+import MemoryMap from "@/components/MemoryMap";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
 import FilterDrawer from "@/components/FilterDrawer";
@@ -83,9 +84,9 @@ const Index = () => {
     return result;
   }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter]);
 
-  // Reset page when filters change
-  const prevFilteredLen = useMemo(() => filtered.length, [filtered]);
-  useMemo(() => { setPage(1); }, [searchQuery, selectedMoods, selectedTags, dateFilter]);
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter]);
 
   const paginatedMemories = useMemo(() => {
     return filtered.slice(0, page * POSTS_PER_PAGE);
@@ -187,10 +188,25 @@ const Index = () => {
                   <List size={14} />
                   <span>List</span>
                 </button>
+                <button
+                  onClick={() => setViewMode("map")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    viewMode === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  aria-label="Map view"
+                >
+                  <Map size={14} />
+                  <span>Map</span>
+                </button>
               </div>
             </div>
-            <Timeline memories={paginatedMemories} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} viewMode={viewMode} />
-            {hasMorePages && (
+            {viewMode === "map" ? (
+              <MemoryMap memories={filtered} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} />
+            ) : (
+              <Timeline memories={paginatedMemories} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} viewMode={viewMode} />
+            )}
+            {viewMode !== "map" && hasMorePages && (
               <Button
                 variant="outline"
                 size="sm"

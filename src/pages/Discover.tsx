@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemories } from "@/hooks/useMemories";
+import { useAuth } from "@/contexts/AuthContext";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { Memory, MOODS, MEMORY_TYPES } from "@/types/memory";
-import { Calendar, SlidersHorizontal, X, Search, Heart, Bookmark, ChevronLeft, ChevronRight, Sparkles, Maximize2 } from "lucide-react";
+import { Calendar, SlidersHorizontal, X, Search, Heart, Bookmark, ChevronLeft, ChevronRight, Sparkles, Maximize2, UserPlus, UserCheck, MapPin } from "lucide-react";
 import AISuggestDrawer from "@/components/AISuggestDrawer";
 import FilterDrawer from "@/components/FilterDrawer";
 import { useLikes } from "@/hooks/useLikes";
@@ -11,16 +12,25 @@ import { usePlaylist } from "@/hooks/usePlaylist";
 import MiniPlayer from "@/components/MiniPlayer";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { formatMemoryTime } from "@/lib/memoryTime";
 
 const SWIPE_THRESHOLD = 60;
+
+interface ProfileResult {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
 
 const MOOD_GRADIENTS: Record<string, string> = {
   Joyful: "bg-gradient-to-br from-amber-300 to-orange-400",
@@ -41,6 +51,8 @@ const getMoodGradient = (mood: string) => {
 
 const Discover = () => {
   const { addMemory } = useMemories();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,39 +67,260 @@ const Discover = () => {
   const [showAISuggest, setShowAISuggest] = useState(false);
   const [aiFilterIds, setAiFilterIds] = useState<string[] | null>(null);
   const [aiReason, setAiReason] = useState("");
-  useEffect(() => {
-    const fetchPublic = async () => {
-      const { data, error } = await supabase
-        .from("memories")
-        .select("*")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false });
+  const [profileFilter, setProfileFilter] = useState<{ userId: string; username: string } | null>(null);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [showUserSearch, setShowUserSearch] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [userResults, setUserResults] = useState<ProfileResult[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [followSavingId, setFollowSavingId] = useState<string | null>(null);
 
-      if (error) {
-        toast.error("Failed to load discoveries");
-        console.error(error);
-      } else {
-        setMemories(
-          (data ?? []).map((r) => ({
+  const showProfilePosts = (memory: Memory) => {
+    if (!memory.userId || !memory.username) return;
+    setProfileFilter({ userId: memory.userId, username: memory.username });
+    setExpandedMemory(null);
+    setCurrentIndex(0);
+    setSearchParams({ profile: memory.userId, username: memory.username });
+  };
+
+  const clearProfileFilter = () => {
+    setProfileFilter(null);
+    setSearchParams({});
+  };
+
+  const fetchFollowing = useCallback(async () => {
+    if (!user) {
+      setFollowingIds(new Set());
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", user.id);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setFollowingIds(new Set((data ?? []).map((follow) => follow.following_id)));
+  }, [user]);
+
+  const toggleFollow = async (profile: { userId: string; username: string }) => {
+    if (!user) {
+      toast.error("Sign in before following people");
+      return;
+    }
+    if (profile.userId === user.id) return;
+    if (followSavingId === profile.userId) return;
+
+    setFollowSavingId(profile.userId);
+    const isFollowing = followingIds.has(profile.userId);
+    const { error } = isFollowing
+      ? await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", user.id)
+          .eq("following_id", profile.userId)
+      : await supabase
+          .from("follows")
+          .insert({ follower_id: user.id, following_id: profile.userId });
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setFollowingIds((prev) => {
+        const next = new Set(prev);
+        if (isFollowing) next.delete(profile.userId);
+        else next.add(profile.userId);
+        return next;
+      });
+      toast.success(isFollowing ? `Unfollowed @${profile.username}` : `Following @${profile.username}`);
+    }
+    await fetchFollowing();
+    setFollowSavingId(null);
+  };
+
+  const fetchPublic = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("memories")
+      .select("*")
+      .eq("is_public", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error("Failed to load discoveries");
+      console.error(error);
+    } else {
+      const rows = data ?? [];
+      const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)));
+      const { data: profiles, error: profilesError } = userIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("user_id, username, display_name, avatar_url")
+            .in("user_id", userIds)
+        : { data: [], error: null };
+
+      if (profilesError) {
+        console.error(profilesError);
+      }
+
+      const profilesByUserId = new Map(
+        (profiles ?? []).map((profile) => [profile.user_id, profile])
+      );
+
+      setMemories(
+        rows.map((r) => {
+          const profile = profilesByUserId.get(r.user_id);
+
+          return {
             id: r.id,
             title: r.title,
             description: r.description ?? "",
             songTitle: r.song_title,
             artist: r.artist,
             date: r.date,
+            memoryYear: r.memory_year ?? null,
+            memorySeason: r.memory_season ?? null,
+            locationName: r.location_name ?? null,
+            locationLat: r.location_lat ?? null,
+            locationLng: r.location_lng ?? null,
+            locationPlaceId: r.location_place_id ?? null,
             mood: r.mood,
             people: r.people ?? [],
             isPublic: true,
             imageUrl: r.image_url ?? null,
             tags: r.tags ?? [],
             createdAt: r.created_at,
-          }))
-        );
-      }
-      setLoading(false);
-    };
-    fetchPublic();
+            userId: r.user_id,
+            username: profile?.username ?? null,
+            displayName: profile?.display_name ?? null,
+            avatarUrl: profile?.avatar_url ?? null,
+          };
+        })
+      );
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchPublic();
+  }, [fetchPublic]);
+
+  useEffect(() => {
+    const profileUserId = searchParams.get("profile");
+    const profileUsername = searchParams.get("username");
+
+    if (profileUserId && profileUsername) {
+      setProfileFilter({ userId: profileUserId, username: profileUsername });
+      setCurrentIndex(0);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("discover-public-feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "memories",
+        },
+        () => {
+          fetchPublic();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+        },
+        () => {
+          fetchPublic();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchPublic]);
+
+  useEffect(() => {
+    fetchFollowing();
+  }, [fetchFollowing]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`discover-follows-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "follows",
+          filter: `follower_id=eq.${user.id}`,
+        },
+        () => {
+          fetchFollowing();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchFollowing]);
+
+  useEffect(() => {
+    if (!showUserSearch) return;
+    const query = userSearch.trim().toLowerCase();
+
+    if (query.length < 2) {
+      setUserResults([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = window.setTimeout(async () => {
+      setUserSearchLoading(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, username, display_name, avatar_url")
+        .ilike("username", `%${query}%`)
+        .limit(10);
+
+      if (!cancelled) {
+        if (error) {
+          console.error(error);
+          toast.error("Failed to search users");
+        } else {
+          setUserResults(
+            (data ?? [])
+              .filter((profile) => profile.username && profile.user_id !== user?.id)
+              .map((profile) => ({
+                userId: profile.user_id,
+                username: profile.username!,
+                displayName: profile.display_name,
+                avatarUrl: profile.avatar_url,
+              }))
+          );
+        }
+        setUserSearchLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [showUserSearch, userSearch, user]);
 
   const toggleMood = (mood: string) => {
     setSelectedMoods((prev) =>
@@ -108,25 +341,32 @@ const Discover = () => {
     setDateFilter(undefined);
     setAiFilterIds(null);
     setAiReason("");
+    setProfileFilter(null);
   };
 
-  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || aiFilterIds !== null;
+  const trimmedSearchQuery = searchQuery.trim();
+  const hasSearchQuery = trimmedSearchQuery.length > 0;
+  const hasActiveFilters = hasSearchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || aiFilterIds !== null || profileFilter !== null;
 
   const filtered = useMemo(() => {
     let result = memories;
+    if (profileFilter) {
+      result = result.filter((m) => m.userId === profileFilter.userId);
+    }
     // AI filter takes priority
     if (aiFilterIds !== null) {
       result = aiFilterIds
         .map((id) => result.find((m) => m.id === id))
         .filter(Boolean) as Memory[];
     }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (hasSearchQuery) {
+      const q = trimmedSearchQuery.toLowerCase();
       result = result.filter(
         (m) =>
           m.title.toLowerCase().includes(q) ||
           m.songTitle.toLowerCase().includes(q) ||
           m.artist.toLowerCase().includes(q) ||
+          (m.locationName?.toLowerCase().includes(q) ?? false) ||
           m.people.some((p) => p.toLowerCase().includes(q))
       );
     }
@@ -150,12 +390,12 @@ const Discover = () => {
       });
     }
     return result;
-  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter, aiFilterIds]);
+  }, [memories, profileFilter, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, aiFilterIds]);
 
   // Reset index when filters change
   useEffect(() => {
     setCurrentIndex(0);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, profileFilter]);
 
   const memoryIds = useMemo(() => filtered.map((m) => m.id), [filtered]);
   const { likeCounts, userLikes, toggleLike } = useLikes(memoryIds);
@@ -175,7 +415,7 @@ const Discover = () => {
     }
   }, [currentIndex]);
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x < -SWIPE_THRESHOLD) goNext();
     else if (info.offset.x > SWIPE_THRESHOLD) goPrev();
   };
@@ -224,6 +464,15 @@ const Discover = () => {
             <Sparkles size={16} />
           </Button>
           <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowUserSearch(true)}
+            className="shrink-0"
+            title="Find users"
+          >
+            <UserPlus size={16} />
+          </Button>
+          <Button
             variant={showFilters ? "secondary" : "outline"}
             size="icon"
             onClick={() => setShowFilters(true)}
@@ -252,6 +501,35 @@ const Discover = () => {
           </div>
         )}
 
+        {profileFilter && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground">Viewing profile</p>
+              <p className="text-sm font-medium text-foreground truncate">@{profileFilter.username}</p>
+            </div>
+            {user?.id !== profileFilter.userId && (
+              <button
+                onClick={() => toggleFollow(profileFilter)}
+                disabled={followSavingId === profileFilter.userId}
+                className={cn(
+                  "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  followingIds.has(profileFilter.userId)
+                    ? "bg-muted text-foreground hover:bg-muted/80"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                )}
+              >
+                {followingIds.has(profileFilter.userId) ? "Unfollow" : "Follow"}
+              </button>
+            )}
+            <button
+              onClick={clearProfileFilter}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Card area */}
         {loading ? (
           <p className="text-center text-sm text-muted-foreground py-20">Loading discoveries...</p>
@@ -264,6 +542,81 @@ const Discover = () => {
             <p className="text-sm text-muted-foreground">
               {hasActiveFilters ? "Try adjusting your filters" : "Be the first to share a memory publicly!"}
             </p>
+          </div>
+        ) : profileFilter || hasSearchQuery ? (
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pb-2">
+            {filtered.map((mem) => {
+              const firstEmoji = mem.mood.split(",")[0]?.trim().split(" ")[0] ?? "";
+
+              return (
+                <div
+                  key={mem.id}
+                  className="rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer"
+                  onClick={() => setExpandedMemory(mem)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg shrink-0">{firstEmoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{mem.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {mem.songTitle} — {mem.artist}
+                      </p>
+                      {mem.locationName && (
+                        <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          <MapPin size={10} className="shrink-0" />
+                          <span className="min-w-0 truncate">{mem.locationName}</span>
+                        </p>
+                      )}
+                    </div>
+                    <div className="hidden xs:flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                      <Calendar size={11} />
+                      <span>{formatMemoryTime(mem)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => {
+                          const wasLiked = userLikes.has(mem.id);
+                          toggleLike(mem.id);
+                          toast.success(wasLiked ? "Removed like" : "Liked this memory!");
+                        }}
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground transition-colors",
+                          userLikes.has(mem.id) && "text-foreground"
+                        )}
+                        aria-label={userLikes.has(mem.id) ? "Unlike memory" : "Like memory"}
+                      >
+                        <Heart size={16} className={userLikes.has(mem.id) ? "fill-foreground" : ""} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const inList = isSongInPlaylist(mem.songTitle, mem.artist);
+                          if (inList) {
+                            const song = songs.find(
+                              (s) => s.songTitle.toLowerCase() === mem.songTitle.toLowerCase() && s.artist.toLowerCase() === mem.artist.toLowerCase()
+                            );
+                            if (song) {
+                              removeSong(song.id);
+                              toast.success("Removed from your playlist");
+                            }
+                          } else {
+                            addSong(mem.songTitle, mem.artist, mem.id);
+                            toast.success("Added to your playlist!");
+                          }
+                        }}
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground transition-colors",
+                          isSongInPlaylist(mem.songTitle, mem.artist) && "text-foreground"
+                        )}
+                        aria-label={isSongInPlaylist(mem.songTitle, mem.artist) ? "Remove from playlist" : "Add to playlist"}
+                      >
+                        <Bookmark size={16} className={isSongInPlaylist(mem.songTitle, mem.artist) ? "fill-foreground" : ""} />
+                      </button>
+                      <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} variant="compact" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex-1 min-h-0">
@@ -280,7 +633,7 @@ const Discover = () => {
                   <motion.div
                     key={mem.id}
                     className={cn(
-                      "shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full flex flex-col gap-2",
+                      "min-w-0 shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full flex flex-col gap-2 overflow-hidden",
                       i === currentIndex ? "opacity-100" : "opacity-40"
                     )}
                     drag="x"
@@ -289,11 +642,17 @@ const Discover = () => {
                     onDragEnd={handleDragEnd}
                   >
                     <div
-                      className="rounded-lg border border-border bg-card overflow-hidden grid flex-1 min-h-0 relative"
+                      className="min-w-0 max-w-full rounded-lg border border-border bg-card overflow-hidden grid flex-1 min-h-0 relative"
                       style={{ gridTemplateRows: "1fr auto" }}
                     >
                       <div className={cn("w-full overflow-hidden min-h-0 relative", !mem.imageUrl && getMoodGradient(mem.mood))}>
                         {mem.imageUrl && <img src={mem.imageUrl} alt="" className="size-full object-cover" />}
+                        {mem.locationName && (
+                          <div className="absolute left-2 top-2 z-20 flex max-w-[70%] min-w-0 overflow-hidden items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                            <MapPin size={12} className="shrink-0" />
+                            <span className="block min-w-0 truncate">{mem.locationName}</span>
+                          </div>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); setExpandedMemory(mem); }}
                           onPointerDown={(e) => e.stopPropagation()}
@@ -306,16 +665,25 @@ const Discover = () => {
                           <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} autoPlay={i === currentIndex} variant="overlay" />
                         </div>
                       </div>
-                      <div className="px-5 py-4 flex flex-col">
-                        <h3 className="font-display text-lg font-semibold leading-snug mb-2 text-foreground shrink-0">
+                      <div className="min-w-0 max-w-full overflow-hidden px-5 py-4 flex flex-col">
+                        {mem.username && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); showProfilePosts(mem); }}
+                            className="mb-2 w-fit text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            @{mem.username}
+                          </button>
+                        )}
+                        <h3 className="min-w-0 max-w-full break-words font-display text-lg font-semibold leading-snug mb-2 text-foreground shrink-0">
                           {mem.title}
                         </h3>
-                        <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="flex min-w-0 items-center justify-between gap-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             <Calendar size={12} />
-                            <span>{format(new Date(mem.date), "MMM d, yyyy")}</span>
+                            <span>{formatMemoryTime(mem)}</span>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex shrink-0 items-center gap-3">
                               <button
                                 onClick={() => {
                                   const wasLiked = userLikes.has(mem.id);
@@ -408,24 +776,41 @@ const Discover = () => {
 
       {expandedMemory && (
         <Dialog open onOpenChange={(open) => !open && setExpandedMemory(null)}>
-          <DialogContent className="sm:max-w-md h-full sm:h-auto w-full sm:w-auto max-h-full sm:max-h-[85vh] rounded-none sm:rounded-lg flex flex-col p-0 gap-0 [&>button]:z-50">
-            <div className="flex-1 overflow-y-auto p-6 pt-12 space-y-4">
+          <DialogContent className="h-full max-h-full w-full min-w-0 overflow-hidden rounded-none p-0 gap-0 sm:h-auto sm:max-h-[85vh] sm:w-[calc(100vw-2rem)] sm:max-w-md sm:rounded-lg [&>button]:z-50 [&>button]:flex [&>button]:h-9 [&>button]:w-9 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full [&>button]:bg-black/55 [&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:ring-offset-0 [&>button]:transition-colors [&>button:hover]:bg-black/70">
+            <div className="min-w-0 flex-1 overflow-y-auto p-6 pt-12 space-y-4">
               {expandedMemory.imageUrl && (
                 <img src={expandedMemory.imageUrl} alt="" className="w-full h-48 object-cover rounded-md" />
               )}
-              <DialogHeader>
-                <DialogTitle className="font-display text-xl">{expandedMemory.title}</DialogTitle>
+              <DialogHeader className="min-w-0">
+                {expandedMemory.username && (
+                  <button
+                    type="button"
+                    onClick={() => showProfilePosts(expandedMemory)}
+                    className="mb-1 w-fit text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    @{expandedMemory.username}
+                  </button>
+                )}
+                <DialogTitle className="min-w-0 break-words font-display text-xl leading-snug">{expandedMemory.title}</DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              <p className="min-w-0 break-words text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                 {expandedMemory.description}
               </p>
-              <MiniPlayer songTitle={expandedMemory.songTitle} artist={expandedMemory.artist} />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Calendar size={12} />
-                  <span>{format(new Date(expandedMemory.date), "MMM d, yyyy")}</span>
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <MiniPlayer songTitle={expandedMemory.songTitle} artist={expandedMemory.artist} />
+              </div>
+              {expandedMemory.locationName && (
+                <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin size={12} className="shrink-0" />
+                  <span className="min-w-0 break-words">{expandedMemory.locationName}</span>
                 </div>
-                <div className="flex items-center gap-3">
+              )}
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <Calendar size={12} />
+                  <span>{formatMemoryTime(expandedMemory)}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
                   <button
                     onClick={() => {
                       const wasLiked = userLikes.has(expandedMemory.id);
@@ -471,6 +856,77 @@ const Discover = () => {
           </DialogContent>
         </Dialog>
       )}
+      <Dialog open={showUserSearch} onOpenChange={setShowUserSearch}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Find Users</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Search @username"
+                className="pl-9"
+              />
+            </div>
+
+            <div className="space-y-2">
+              {userSearch.trim().length < 2 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Type at least 2 characters.</p>
+              ) : userSearchLoading ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Searching...</p>
+              ) : userResults.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No users found.</p>
+              ) : (
+                userResults.map((profile) => (
+                  <div key={profile.userId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileFilter({ userId: profile.userId, username: profile.username });
+                        setShowUserSearch(false);
+                        setCurrentIndex(0);
+                      }}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <p className="text-sm font-medium text-foreground truncate">@{profile.username}</p>
+                      {profile.displayName && (
+                        <p className="text-xs text-muted-foreground truncate">{profile.displayName}</p>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleFollow(profile)}
+                      disabled={followSavingId === profile.userId}
+                      className={cn(
+                        "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                        followingIds.has(profile.userId)
+                          ? "bg-muted text-foreground hover:bg-muted/80"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                      )}
+                    >
+                      {followingIds.has(profile.userId) ? (
+                        <span className="inline-flex items-center gap-1">
+                          <UserCheck size={13} />
+                          Following
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          <UserPlus size={13} />
+                          Follow
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <AISuggestDrawer
         open={showAISuggest}
         onOpenChange={setShowAISuggest}

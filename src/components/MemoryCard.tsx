@@ -1,7 +1,7 @@
 import { Memory } from "@/types/memory";
-import { Calendar, Trash2, Users, Pencil, Maximize2 } from "lucide-react";
+import { Calendar, Trash2, Users, Pencil, Maximize2, MapPin } from "lucide-react";
 import MiniPlayer from "@/components/MiniPlayer";
-import { format } from "date-fns";
+import { formatMemoryTime } from "@/lib/memoryTime";
 
 interface MemoryCardProps {
   memory: Memory;
@@ -12,33 +12,35 @@ interface MemoryCardProps {
 }
 
 const MemoryCard = ({ memory, onDelete, onEdit, onClick }: MemoryCardProps) => {
+  const actionButtonClass = "flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70";
+
   return (
     <div className="group relative rounded-lg border border-border bg-card overflow-hidden transition-all hover:shadow-md">
-      <div className="absolute right-3 top-3 z-10 flex gap-1">
+      <div className="absolute right-3 top-3 z-10 flex gap-2">
         {onClick && (
           <button
             onClick={(e) => { e.stopPropagation(); onClick(memory); }}
-            className="text-muted-foreground hover:text-foreground bg-background/60 backdrop-blur-sm rounded-full p-1"
+            className={actionButtonClass}
             aria-label="Open memory"
           >
-            <Maximize2 size={16} />
+            <Maximize2 size={19} />
           </button>
         )}
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(memory); }}
-            className="text-muted-foreground hover:text-foreground bg-background/60 backdrop-blur-sm rounded-full p-1"
+            className={actionButtonClass}
             aria-label="Edit memory"
           >
-            <Pencil size={16} />
+            <Pencil size={19} />
           </button>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(memory.id); }}
-          className="text-muted-foreground hover:text-destructive bg-background/60 backdrop-blur-sm rounded-full p-1"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
           aria-label="Delete memory"
         >
-          <Trash2 size={16} />
+          <Trash2 size={19} />
         </button>
       </div>
 
@@ -71,9 +73,16 @@ const MemoryCard = ({ memory, onDelete, onEdit, onClick }: MemoryCardProps) => {
         </div>
       )}
 
+      {memory.locationName && (
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground mb-3">
+          <MapPin size={12} className="shrink-0" />
+          <span className="min-w-0 truncate">{memory.locationName}</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Calendar size={12} />
-        <span>{format(new Date(memory.date), "MMM d, yyyy")}</span>
+        <span>{formatMemoryTime(memory)}</span>
       </div>
       </div>
     </div>

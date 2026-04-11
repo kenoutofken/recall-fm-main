@@ -29,6 +29,12 @@ export function useMemories() {
           songTitle: r.song_title,
           artist: r.artist,
           date: r.date,
+          memoryYear: r.memory_year ?? null,
+          memorySeason: r.memory_season ?? null,
+          locationName: r.location_name ?? null,
+          locationLat: r.location_lat ?? null,
+          locationLng: r.location_lng ?? null,
+          locationPlaceId: r.location_place_id ?? null,
           mood: r.mood,
           people: r.people ?? [],
           isPublic: r.is_public ?? false,
@@ -41,7 +47,33 @@ export function useMemories() {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { fetchMemories(); }, [fetchMemories]);
+  useEffect(() => {
+    fetchMemories();
+  }, [fetchMemories]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`journal-memories-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "memories",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchMemories();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchMemories]);
 
   const addMemory = async (memory: Omit<Memory, "id" | "createdAt">) => {
     if (!user) return;
@@ -52,6 +84,12 @@ export function useMemories() {
       song_title: memory.songTitle,
       artist: memory.artist,
       date: memory.date,
+      memory_year: memory.memoryYear ?? null,
+      memory_season: memory.memorySeason ?? null,
+      location_name: memory.locationName ?? null,
+      location_lat: memory.locationLat ?? null,
+      location_lng: memory.locationLng ?? null,
+      location_place_id: memory.locationPlaceId ?? null,
       mood: memory.mood,
       people: memory.people,
       is_public: memory.isPublic,
@@ -59,7 +97,7 @@ export function useMemories() {
       tags: memory.tags ?? [],
     });
     if (error) {
-      toast.error("Failed to save memory");
+      toast.error(error.message || "Failed to save memory");
       console.error(error);
     } else {
       toast.success("Memory saved!");
@@ -74,6 +112,12 @@ export function useMemories() {
       song_title: memory.songTitle,
       artist: memory.artist,
       date: memory.date,
+      memory_year: memory.memoryYear ?? null,
+      memory_season: memory.memorySeason ?? null,
+      location_name: memory.locationName ?? null,
+      location_lat: memory.locationLat ?? null,
+      location_lng: memory.locationLng ?? null,
+      location_place_id: memory.locationPlaceId ?? null,
       mood: memory.mood,
       people: memory.people,
       is_public: memory.isPublic,
@@ -81,7 +125,7 @@ export function useMemories() {
       tags: memory.tags ?? [],
     }).eq("id", id);
     if (error) {
-      toast.error("Failed to update memory");
+      toast.error(error.message || "Failed to update memory");
       console.error(error);
     } else {
       toast.success("Memory updated!");

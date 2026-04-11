@@ -1,15 +1,30 @@
 import { useState, useRef } from "react";
-import { MOODS, MEMORY_TYPES } from "@/types/memory";
-import { Music, X, Users, Plus, Globe, Lock, ImagePlus, Loader2, Sparkles } from "lucide-react";
+import { MOODS, MEMORY_SEASONS, MEMORY_TYPES } from "@/types/memory";
+import { Music, X, Users, Plus, Globe, Lock, ImagePlus, Loader2, Sparkles, MapPin } from "lucide-react";
 import SongSearch from "@/components/SongSearch";
 import { compressImage } from "@/lib/compressImage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { dateFromYearSeason, seasonFromDate, yearFromDate } from "@/lib/memoryTime";
 import { toast } from "sonner";
+import LocationSearch, { type LocationResult } from "@/components/LocationSearch";
 
 import { Memory } from "@/types/memory";
 
 type FormStage = "ai" | "form";
+type DraftMemory = {
+  title?: unknown;
+  description?: unknown;
+  songTitle?: unknown;
+  artist?: unknown;
+  memoryYear?: unknown;
+  memorySeason?: unknown;
+  locationName?: unknown;
+  date?: unknown;
+  people?: unknown;
+  tags?: unknown;
+  moods?: unknown;
+};
 
 interface AddMemoryFormProps {
   onAdd: (memory: {
@@ -18,6 +33,12 @@ interface AddMemoryFormProps {
     songTitle: string;
     artist: string;
     date: string;
+    memoryYear?: number | null;
+    memorySeason?: string | null;
+    locationName?: string | null;
+    locationLat?: number | null;
+    locationLng?: number | null;
+    locationPlaceId?: string | null;
     mood: string;
     people: string[];
     isPublic: boolean;
@@ -37,7 +58,16 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
   const [description, setDescription] = useState(editingMemory?.description ?? "");
   const [songTitle, setSongTitle] = useState(editingMemory?.songTitle ?? "");
   const [artist, setArtist] = useState(editingMemory?.artist ?? "");
-  const [date, setDate] = useState(editingMemory?.date ?? new Date().toISOString().split("T")[0]);
+  const [memoryYear, setMemoryYear] = useState(
+    editingMemory?.memoryYear ?? yearFromDate(editingMemory?.date ?? new Date().toISOString())
+  );
+  const [memorySeason, setMemorySeason] = useState(
+    editingMemory?.memorySeason ?? seasonFromDate(editingMemory?.date ?? new Date().toISOString())
+  );
+  const [locationName, setLocationName] = useState(editingMemory?.locationName ?? "");
+  const [locationLat, setLocationLat] = useState<number | null>(editingMemory?.locationLat ?? null);
+  const [locationLng, setLocationLng] = useState<number | null>(editingMemory?.locationLng ?? null);
+  const [locationPlaceId, setLocationPlaceId] = useState<string | null>(editingMemory?.locationPlaceId ?? null);
   const [selectedMoods, setSelectedMoods] = useState<string[]>(
     editingMemory?.mood ? editingMemory.mood.split(",").map(s => s.trim()).filter(Boolean) : []
   );
@@ -60,12 +90,23 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     return match ? `${match.emoji} ${match.label}` : mood.trim();
   };
 
-  const applyDraft = (draft: any) => {
+  const applyDraft = (draft: DraftMemory) => {
     if (typeof draft.title === "string") setTitle(draft.title.slice(0, 80));
     if (typeof draft.description === "string") setDescription(draft.description);
     if (typeof draft.songTitle === "string") setSongTitle(draft.songTitle);
     if (typeof draft.artist === "string") setArtist(draft.artist);
-    if (typeof draft.date === "string" && draft.date) setDate(draft.date);
+    if (typeof draft.memoryYear === "number") setMemoryYear(draft.memoryYear);
+    if (typeof draft.memorySeason === "string" && (MEMORY_SEASONS as readonly string[]).includes(draft.memorySeason)) setMemorySeason(draft.memorySeason);
+    if (typeof draft.locationName === "string") {
+      setLocationName(draft.locationName.slice(0, 120));
+      setLocationLat(null);
+      setLocationLng(null);
+      setLocationPlaceId(null);
+    }
+    if (typeof draft.date === "string" && draft.date && typeof draft.memoryYear !== "number") {
+      setMemoryYear(yearFromDate(draft.date));
+      setMemorySeason(seasonFromDate(draft.date));
+    }
     if (Array.isArray(draft.people)) setPeople(draft.people.filter((p: unknown) => typeof p === "string" && p.trim()).slice(0, 8));
     if (Array.isArray(draft.tags)) setSelectedTags(draft.tags.filter((t: unknown) => typeof t === "string" && t.trim()).slice(0, 8));
     if (Array.isArray(draft.moods)) {
@@ -251,18 +292,56 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     setCustomTagInput("");
   };
 
+  const updateLocation = (name: string, location?: LocationResult | null) => {
+    setLocationName(name);
+
+    if (location === null) {
+      setLocationLat(null);
+      setLocationLng(null);
+      setLocationPlaceId(null);
+      return;
+    }
+
+    if (location) {
+      setLocationLat(location.lat);
+      setLocationLng(location.lng);
+      setLocationPlaceId(location.placeId);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !songTitle || !artist || selectedMoods.length === 0) return;
     const imageUrl = await uploadImage();
-    onAdd({ title, description, songTitle, artist, date, mood: selectedMoods.join(", "), people, isPublic, imageUrl, tags: selectedTags });
+    onAdd({
+      title,
+      description,
+      songTitle,
+      artist,
+      date: dateFromYearSeason(memoryYear, memorySeason),
+      memoryYear,
+      memorySeason,
+      locationName: locationName.trim() || null,
+      locationLat: locationName.trim() ? locationLat : null,
+      locationLng: locationName.trim() ? locationLng : null,
+      locationPlaceId: locationName.trim() ? locationPlaceId : null,
+      mood: selectedMoods.join(", "),
+      people,
+      isPublic,
+      imageUrl,
+      tags: selectedTags,
+    });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-0 sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-0 sm:p-4"
+      onClick={onClose}
+    >
       <form
         onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-lg bg-background sm:rounded-2xl p-6 h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto shadow-xl animate-fade-in"
       >
         <div className="flex items-center justify-between mb-6">
@@ -419,12 +498,33 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block">When was this?</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={memorySeason}
+                onChange={(e) => setMemorySeason(e.target.value)}
+                className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {MEMORY_SEASONS.map((season) => (
+                  <option key={season} value={season}>{season}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1900}
+                max={new Date().getFullYear() + 1}
+                value={memoryYear}
+                onChange={(e) => setMemoryYear(Number(e.target.value) || new Date().getFullYear())}
+                className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block">
+              <span className="flex items-center gap-1.5"><MapPin size={14} className="text-primary" /> Where was this?</span>
+            </label>
+            <LocationSearch value={locationName} onChange={updateLocation} maxLength={120} />
           </div>
 
           <div>
@@ -538,7 +638,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
                 );
               })}
               {selectedTags
-                .filter((t) => !MEMORY_TYPES.includes(t as any))
+                .filter((t) => !(MEMORY_TYPES as readonly string[]).includes(t))
                 .map((custom) => (
                   <button
                     key={custom}

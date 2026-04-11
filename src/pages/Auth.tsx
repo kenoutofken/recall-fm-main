@@ -12,6 +12,7 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const initialView = (searchParams.get("view") as AuthView) || "landing";
   const [view, setView] = useState<AuthView>(initialView);
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,6 +21,8 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const normalizedUsername = username.trim().toLowerCase();
 
   useEffect(() => {
     if (user) navigate("/", { replace: true });
@@ -30,19 +33,65 @@ const Auth = () => {
     setLoading(true);
 
     if (view === "signup") {
+      if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+        toast.error("Username must be 3-24 characters using lowercase letters, numbers, or underscores");
+        setLoading(false);
+        return;
+      }
+
       if (password !== confirmPassword) {
         toast.error("Passwords do not match");
         setLoading(false);
         return;
       }
-      const { error } = await supabase.auth.signUp({
+
+      const { data: existingProfile, error: usernameError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("username", normalizedUsername)
+        .maybeSingle();
+
+      if (usernameError) {
+        toast.error(usernameError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (existingProfile) {
+        toast.error("That username is already taken");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: window.location.origin },
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            username: normalizedUsername,
+            display_name: normalizedUsername,
+          },
+        },
       });
       if (error) {
         toast.error(error.message);
       } else {
+        if (data.user && data.session) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .upsert({
+              user_id: data.user.id,
+              username: normalizedUsername,
+              display_name: normalizedUsername,
+            });
+
+          if (profileError) {
+            toast.error(profileError.message);
+            setLoading(false);
+            return;
+          }
+        }
         setView("signup-success");
       }
     } else {
@@ -100,6 +149,27 @@ const Auth = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Username</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">@</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2.5 pl-7 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="username"
+                  required
+                  minLength={3}
+                  maxLength={24}
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Lowercase letters, numbers, and underscores only.
+              </p>
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block">Email</label>
             <input

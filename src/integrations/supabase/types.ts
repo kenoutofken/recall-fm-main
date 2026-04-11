@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
       memories: {
         Row: {
           artist: string
@@ -23,6 +44,12 @@ export type Database = {
           id: string
           image_url: string | null
           is_public: boolean
+          location_lat: number | null
+          location_lng: number | null
+          location_name: string | null
+          location_place_id: string | null
+          memory_season: string | null
+          memory_year: number | null
           mood: string
           people: string[]
           song_title: string
@@ -38,6 +65,12 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_public?: boolean
+          location_lat?: number | null
+          location_lng?: number | null
+          location_name?: string | null
+          location_place_id?: string | null
+          memory_season?: string | null
+          memory_year?: number | null
           mood: string
           people?: string[]
           song_title: string
@@ -53,6 +86,12 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_public?: boolean
+          location_lat?: number | null
+          location_lng?: number | null
+          location_name?: string | null
+          location_place_id?: string | null
+          memory_season?: string | null
+          memory_year?: number | null
           mood?: string
           people?: string[]
           song_title?: string
@@ -125,6 +164,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
