@@ -9,6 +9,8 @@ import { toast } from "sonner";
 
 import { Memory } from "@/types/memory";
 
+type FormStage = "ai" | "form";
+
 interface AddMemoryFormProps {
   onAdd: (memory: {
     title: string;
@@ -28,6 +30,9 @@ interface AddMemoryFormProps {
 
 const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) => {
   const { user } = useAuth();
+  const [stage, setStage] = useState<FormStage>(editingMemory ? "form" : "ai");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [drafting, setDrafting] = useState(false);
   const [title, setTitle] = useState(editingMemory?.title ?? "");
   const [description, setDescription] = useState(editingMemory?.description ?? "");
   const [songTitle, setSongTitle] = useState(editingMemory?.songTitle ?? "");
@@ -48,6 +53,73 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
   const [generating, setGenerating] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const normalizeMood = (mood: string) => {
+    const cleanMood = mood.trim().toLowerCase();
+    const match = MOODS.find((m) => cleanMood === m.label.toLowerCase() || cleanMood.includes(m.label.toLowerCase()));
+    return match ? `${match.emoji} ${match.label}` : mood.trim();
+  };
+
+  const applyDraft = (draft: any) => {
+    if (typeof draft.title === "string") setTitle(draft.title.slice(0, 80));
+    if (typeof draft.description === "string") setDescription(draft.description);
+    if (typeof draft.songTitle === "string") setSongTitle(draft.songTitle);
+    if (typeof draft.artist === "string") setArtist(draft.artist);
+    if (typeof draft.date === "string" && draft.date) setDate(draft.date);
+    if (Array.isArray(draft.people)) setPeople(draft.people.filter((p: unknown) => typeof p === "string" && p.trim()).slice(0, 8));
+    if (Array.isArray(draft.tags)) setSelectedTags(draft.tags.filter((t: unknown) => typeof t === "string" && t.trim()).slice(0, 8));
+    if (Array.isArray(draft.moods)) {
+      const moods = draft.moods
+        .filter((m: unknown) => typeof m === "string" && m.trim())
+        .map(normalizeMood)
+        .slice(0, 4);
+      if (moods.length > 0) setSelectedMoods(Array.from(new Set(moods)));
+    }
+  };
+
+  const draftMemory = async () => {
+    const notes = aiPrompt.trim();
+    if (!notes) {
+      toast.error("Add a few notes first");
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      toast.error("Sign in again before using AI Fill");
+      return;
+    }
+
+    setDrafting(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/draft-memory`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ notes }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error || `AI draft failed (${response.status})`);
+      }
+      if (!data?.draft) throw new Error("AI did not return a draft");
+
+      applyDraft(data.draft);
+      setStage("form");
+      toast.success("Draft added. You can edit anything before saving.");
+    } catch (err) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : "Failed to draft memory";
+      toast.error(message);
+    } finally {
+      setDrafting(false);
+    }
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -194,13 +266,67 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
         className="w-full sm:max-w-lg bg-background sm:rounded-2xl p-6 h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto shadow-xl animate-fade-in"
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-display text-xl font-semibold">{editingMemory ? "Edit Memory" : "New Music Memory"}</h2>
+          <h2 className="font-display text-xl font-semibold">
+            {editingMemory ? "Edit Memory" : stage === "ai" ? "Start a Memory" : "New Music Memory"}
+          </h2>
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X size={20} />
           </button>
         </div>
 
+        {stage === "ai" ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+                <Sparkles size={16} className="text-primary" />
+                AI Fill
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Type rough notes, fragments, or bullet points. AI can turn them into the editable memory form.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">What do you remember?</label>
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder={"e.g. last summer\nroad trip to Tofino with Maya\nlistened to Dreams by Fleetwood Mac\nfelt peaceful and nostalgic"}
+                rows={9}
+                className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={draftMemory}
+              disabled={!aiPrompt.trim() || drafting}
+              className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {drafting ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {drafting ? "Drafting…" : "AI Fill the Form"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStage("form")}
+              className="w-full rounded-lg border border-border bg-card py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              Skip and Enter Manually
+            </button>
+          </div>
+        ) : (
         <div className="space-y-4">
+          {!editingMemory && (
+            <button
+              type="button"
+              onClick={() => setStage("ai")}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              <Sparkles size={14} />
+              Back to AI Fill
+            </button>
+          )}
           <div>
             <label className="text-sm font-medium text-foreground mb-1 flex items-center justify-between">
               <span>Describe it in a short phrase</span>
@@ -474,15 +600,18 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
             </div>
           </div>
         </div>
+        )}
 
-        <button
-          type="submit"
-          disabled={!title || !songTitle || !artist || selectedMoods.length === 0 || uploading}
-          className="mt-6 w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {uploading && <Loader2 size={16} className="animate-spin" />}
-          {uploading ? "Uploading…" : editingMemory ? "Update Memory" : "Save Memory"}
-        </button>
+        {stage === "form" && (
+          <button
+            type="submit"
+            disabled={!title || !songTitle || !artist || selectedMoods.length === 0 || uploading}
+            className="mt-6 w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {uploading && <Loader2 size={16} className="animate-spin" />}
+            {uploading ? "Uploading…" : editingMemory ? "Update Memory" : "Save Memory"}
+          </button>
+        )}
       </form>
     </div>
   );

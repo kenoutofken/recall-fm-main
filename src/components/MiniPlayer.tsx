@@ -134,6 +134,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
 
   const handleEnded = () => {
     autoStartedRef.current = false;
+    if (autoPlay) userPausedAutoRef.current = true;
     setPlaying(false);
     setProgress(0);
   };
