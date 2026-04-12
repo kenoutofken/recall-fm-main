@@ -98,11 +98,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
-            <span className="text-muted-foreground/30">|</span>
-            <h1 className="font-display text-xl font-normal text-foreground">Journal</h1>
-          </div>
+          <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
           <UserAvatar />
         </div>
       </header>

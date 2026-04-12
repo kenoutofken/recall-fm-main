@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { formatMemoryTime } from "@/lib/memoryTime";
 
 const SWIPE_THRESHOLD = 60;
+type FeedMode = "community" | "following";
 
 interface ProfileResult {
   userId: string;
@@ -49,6 +50,13 @@ const getMoodGradient = (mood: string) => {
   return MOOD_GRADIENTS[label] ?? "bg-gradient-to-br from-muted to-muted-foreground/20";
 };
 
+const getMoodParts = (mood: string) => (
+  mood
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+);
+
 const Discover = () => {
   const { addMemory } = useMemories();
   const { user } = useAuth();
@@ -67,6 +75,7 @@ const Discover = () => {
   const [showAISuggest, setShowAISuggest] = useState(false);
   const [aiFilterIds, setAiFilterIds] = useState<string[] | null>(null);
   const [aiReason, setAiReason] = useState("");
+  const [feedMode, setFeedMode] = useState<FeedMode>("community");
   const [profileFilter, setProfileFilter] = useState<{ userId: string; username: string } | null>(null);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [showUserSearch, setShowUserSearch] = useState(false);
@@ -85,6 +94,13 @@ const Discover = () => {
 
   const clearProfileFilter = () => {
     setProfileFilter(null);
+    setSearchParams({});
+  };
+
+  const changeFeedMode = (nextMode: FeedMode) => {
+    setFeedMode(nextMode);
+    setProfileFilter(null);
+    setCurrentIndex(0);
     setSearchParams({});
   };
 
@@ -352,6 +368,8 @@ const Discover = () => {
     let result = memories;
     if (profileFilter) {
       result = result.filter((m) => m.userId === profileFilter.userId);
+    } else if (feedMode === "following") {
+      result = result.filter((m) => Boolean(m.userId && followingIds.has(m.userId)));
     }
     // AI filter takes priority
     if (aiFilterIds !== null) {
@@ -390,12 +408,12 @@ const Discover = () => {
       });
     }
     return result;
-  }, [memories, profileFilter, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, aiFilterIds]);
+  }, [memories, profileFilter, feedMode, followingIds, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, aiFilterIds]);
 
   // Reset index when filters change
   useEffect(() => {
     setCurrentIndex(0);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter, profileFilter]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, profileFilter, feedMode]);
 
   const memoryIds = useMemo(() => filtered.map((m) => m.id), [filtered]);
   const { likeCounts, userLikes, toggleLike } = useLikes(memoryIds);
@@ -421,6 +439,17 @@ const Discover = () => {
   };
 
   const currentMemory = filtered[currentIndex];
+  const expandedMoodParts = expandedMemory ? getMoodParts(expandedMemory.mood) : [];
+  const emptyTitle = hasActiveFilters
+    ? "No matches"
+    : feedMode === "following"
+      ? "No followed memories yet"
+      : "Nothing here yet";
+  const emptyMessage = hasActiveFilters
+    ? "Try adjusting your filters"
+    : feedMode === "following"
+      ? "Follow people to see their public memories here."
+      : "Be the first to share a memory publicly!";
 
   const _ = direction; // used by swipe handlers
 
@@ -428,11 +457,7 @@ const Discover = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
-            <span className="text-muted-foreground/30">|</span>
-            <h1 className="font-display text-xl font-normal text-foreground">Discover</h1>
-          </div>
+          <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
           <UserAvatar />
         </div>
       </header>
@@ -487,6 +512,35 @@ const Discover = () => {
           </Button>
         </div>
 
+        {!profileFilter && (
+          <div className="mb-4 grid grid-cols-2 rounded-lg border border-border bg-card p-1">
+            <button
+              type="button"
+              onClick={() => changeFeedMode("community")}
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                feedMode === "community"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => changeFeedMode("following")}
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                feedMode === "following"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Following
+            </button>
+          </div>
+        )}
+
         {/* AI filter banner */}
         {aiFilterIds !== null && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
@@ -537,16 +591,17 @@ const Discover = () => {
           <div className="text-center py-20">
             <p className="text-4xl mb-4">{hasActiveFilters ? "🔍" : "🌍"}</p>
             <h2 className="font-display text-lg font-semibold text-foreground mb-2">
-              {hasActiveFilters ? "No matches" : "Nothing here yet"}
+              {emptyTitle}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {hasActiveFilters ? "Try adjusting your filters" : "Be the first to share a memory publicly!"}
+              {emptyMessage}
             </p>
           </div>
         ) : profileFilter || hasSearchQuery ? (
           <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pb-2">
             {filtered.map((mem) => {
-              const firstEmoji = mem.mood.split(",")[0]?.trim().split(" ")[0] ?? "";
+              const moodParts = getMoodParts(mem.mood);
+              const firstEmoji = moodParts[0]?.split(" ")[0] ?? "";
 
               return (
                 <div
@@ -561,6 +616,20 @@ const Discover = () => {
                       <p className="text-xs text-muted-foreground truncate">
                         {mem.songTitle} — {mem.artist}
                       </p>
+                      {moodParts.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {moodParts.slice(0, 2).map((mood) => (
+                            <Badge key={mood} variant="secondary" className="px-2 py-0 text-[10px] font-medium">
+                              {mood}
+                            </Badge>
+                          ))}
+                          {moodParts.length > 2 && (
+                            <Badge variant="outline" className="px-2 py-0 text-[10px] font-medium text-muted-foreground">
+                              +{moodParts.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                       {mem.locationName && (
                         <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                           <MapPin size={10} className="shrink-0" />
@@ -619,17 +688,19 @@ const Discover = () => {
             })}
           </div>
         ) : (
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {/* Carousel */}
-            <div className="relative overflow-hidden rounded-lg">
+            <div className="relative h-[clamp(320px,calc(100dvh-300px),620px)] overflow-hidden rounded-lg">
               <div
-                className="flex transition-transform duration-300 ease-out"
+                className="flex h-full transition-transform duration-300 ease-out"
                 style={{
-                  height: "calc(100vh - 236px)",
                   transform: `translateX(-${currentIndex * 100}%)`,
                 }}
               >
-                {filtered.map((mem, i) => (
+                {filtered.map((mem, i) => {
+                  const moodParts = getMoodParts(mem.mood);
+
+                  return (
                   <motion.div
                     key={mem.id}
                     className={cn(
@@ -672,6 +743,19 @@ const Discover = () => {
                           >
                             @{mem.username}
                           </button>
+                        )}
+                        {moodParts.length > 0 && (
+                          <div className="mb-2 flex flex-wrap gap-1.5">
+                            {moodParts.slice(0, 3).map((mood) => (
+                              <Badge
+                                key={mood}
+                                variant="secondary"
+                                className="border-white/15 bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm hover:bg-white/18"
+                              >
+                                {mood}
+                              </Badge>
+                            ))}
+                          </div>
                         )}
                         <h3 className="min-w-0 max-w-full break-words font-display text-2xl font-semibold leading-tight">
                           {mem.title}
@@ -750,7 +834,8 @@ const Discover = () => {
                     </div>
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
 
             </div>
@@ -786,6 +871,15 @@ const Discover = () => {
                   </button>
                 )}
                 <DialogTitle className="min-w-0 break-words font-display text-xl leading-snug">{expandedMemory.title}</DialogTitle>
+                {expandedMoodParts.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {expandedMoodParts.map((mood) => (
+                      <Badge key={mood} variant="secondary" className="px-2.5 py-1 text-xs font-medium">
+                        {mood}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </DialogHeader>
               <p className="min-w-0 break-words text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                 {expandedMemory.description}

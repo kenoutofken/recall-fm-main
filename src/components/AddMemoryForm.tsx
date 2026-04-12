@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { MOODS, MEMORY_SEASONS, MEMORY_TYPES } from "@/types/memory";
-import { Music, X, Users, Plus, Globe, Lock, ImagePlus, Loader2, Sparkles, MapPin } from "lucide-react";
+import { Music, X, Users, Plus, Globe, Lock, ImagePlus, Loader2, Sparkles, MapPin, CircleHelp } from "lucide-react";
 import SongSearch from "@/components/SongSearch";
 import { compressImage } from "@/lib/compressImage";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,10 +8,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { dateFromYearSeason, seasonFromDate, yearFromDate } from "@/lib/memoryTime";
 import { toast } from "sonner";
 import LocationSearch, { type LocationResult } from "@/components/LocationSearch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { Memory } from "@/types/memory";
 
 type FormStage = "ai" | "form";
+type FormStep = 0 | 1 | 2;
+const FORM_STEPS = ["Memory", "Song & Date", "Details"] as const;
+const FLOW_STEPS = ["AI Fill", ...FORM_STEPS] as const;
+
 type DraftMemory = {
   title?: unknown;
   description?: unknown;
@@ -49,9 +54,44 @@ interface AddMemoryFormProps {
   editingMemory?: Memory | null;
 }
 
+const FieldHelp = ({ label, help }: { label: string; help: string }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        type="button"
+        aria-label={`Help: ${label}`}
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+      >
+        <CircleHelp size={14} />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent side="top" align="start" className="w-[min(240px,calc(100vw-2rem))] p-3 text-xs leading-relaxed">
+      <p>{help}</p>
+    </PopoverContent>
+  </Popover>
+);
+
+const FieldLabel = ({
+  children,
+  help,
+  label,
+  className = "mb-1",
+}: {
+  children: ReactNode;
+  help: string;
+  label: string;
+  className?: string;
+}) => (
+  <div className={`${className} flex items-center gap-1.5 text-sm font-medium text-foreground`}>
+    <span>{children}</span>
+    <FieldHelp label={label} help={help} />
+  </div>
+);
+
 const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) => {
   const { user } = useAuth();
   const [stage, setStage] = useState<FormStage>(editingMemory ? "form" : "ai");
+  const [formStep, setFormStep] = useState<FormStep>(0);
   const [aiPrompt, setAiPrompt] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [title, setTitle] = useState(editingMemory?.title ?? "");
@@ -152,6 +192,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
       applyDraft(data.draft);
       setStage("form");
+      setFormStep(0);
       toast.success("Draft added. You can edit anything before saving.");
     } catch (err) {
       console.error(err);
@@ -309,6 +350,19 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     }
   };
 
+  const startManualEntry = () => {
+    setStage("form");
+    setFormStep(0);
+  };
+
+  const goToPreviousStep = () => {
+    setFormStep((current) => (current === 0 ? 0 : ((current - 1) as FormStep)));
+  };
+
+  const goToNextStep = () => {
+    setFormStep((current) => (current === 2 ? 2 : ((current + 1) as FormStep)));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !songTitle || !artist || selectedMoods.length === 0) return;
@@ -336,13 +390,13 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-0 sm:p-4"
       onClick={onClose}
     >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-lg bg-background sm:rounded-2xl p-6 h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto shadow-xl animate-fade-in"
+        className="h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-background p-6 shadow-xl animate-in slide-in-from-bottom duration-500 sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl"
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-xl font-semibold">
@@ -355,22 +409,44 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
         {stage === "ai" ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Step 1 of {FLOW_STEPS.length}</span>
+                <span>{FLOW_STEPS[0]}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {FLOW_STEPS.map((step, index) => (
+                  <div
+                    key={step}
+                    className={`h-1.5 rounded-full transition-colors ${
+                      index === 0 ? "bg-primary" : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Sparkles size={16} className="text-primary" />
                 AI Fill
               </div>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Type rough notes, fragments, or bullet points. AI can turn them into the editable memory form.
+                Add a few notes and AI Fill will draft the form for you.
               </p>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">What do you remember?</label>
+              <FieldLabel
+                label="Notes"
+                help="Jot down anything you remember. Fragments are fine."
+              >
+                Notes
+              </FieldLabel>
               <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder={"e.g. last summer\nroad trip to Tofino with Maya\nlistened to Dreams by Fleetwood Mac\nfelt peaceful and nostalgic"}
+                placeholder={"e.g. last summer\nroad trip to Tofino with Maya\nDreams by Fleetwood Mac\npeaceful and nostalgic"}
                 rows={9}
                 className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
               />
@@ -388,7 +464,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
             <button
               type="button"
-              onClick={() => setStage("form")}
+              onClick={startManualEntry}
               className="w-full rounded-lg border border-border bg-card py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               Skip and Enter Manually
@@ -399,18 +475,58 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           {!editingMemory && (
             <button
               type="button"
-              onClick={() => setStage("ai")}
+              onClick={() => {
+                setStage("ai");
+                setFormStep(0);
+              }}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               <Sparkles size={14} />
               Back to AI Fill
             </button>
           )}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Step {editingMemory ? formStep + 1 : formStep + 2} of {editingMemory ? FORM_STEPS.length : FLOW_STEPS.length}
+              </span>
+              <span>{FORM_STEPS[formStep]}</span>
+            </div>
+            <div className={`grid gap-1 ${editingMemory ? "grid-cols-3" : "grid-cols-4"}`}>
+              {(!editingMemory ? FLOW_STEPS : FORM_STEPS).map((step, index) => (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => {
+                    if (!editingMemory && index === 0) {
+                      setStage("ai");
+                      setFormStep(0);
+                      return;
+                    }
+                    setFormStep((editingMemory ? index : index - 1) as FormStep);
+                  }}
+                  className={`h-1.5 rounded-full transition-colors ${
+                    index <= (editingMemory ? formStep : formStep + 1) ? "bg-primary" : "bg-muted"
+                  }`}
+                  aria-label={`Go to ${step}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {formStep === 0 && (
+            <>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 flex items-center justify-between">
-              <span>Describe it in a short phrase</span>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <FieldLabel
+                label="Title"
+                help="A short name for this memory."
+                className="mb-0"
+              >
+                Title
+              </FieldLabel>
               <span className={`text-xs font-normal ${title.length > 70 ? "text-destructive" : "text-muted-foreground"}`}>{80 - title.length}</span>
-            </label>
+            </div>
             <input
               value={title}
               onChange={(e) => { if (e.target.value.length <= 80) setTitle(e.target.value); }}
@@ -422,7 +538,12 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">Tell the story</label>
+            <FieldLabel
+              label="Story"
+              help="What happened, and what do you want to remember about it?"
+            >
+              Story
+            </FieldLabel>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -434,9 +555,12 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
           {/* Image upload / generate */}
           <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
+            <FieldLabel
+              label="Cover image"
+              help="Upload an image or generate one from the memory."
+            >
               <span className="flex items-center gap-1.5"><ImagePlus size={14} className="text-primary" /> Cover image</span>
-            </label>
+            </FieldLabel>
             {imagePreview ? (
               <div className="relative inline-block">
                 <img src={imagePreview} alt="Preview" className="h-32 w-full rounded-lg object-cover border border-border" />
@@ -481,12 +605,18 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
               className="hidden"
             />
           </div>
+            </>
+          )}
 
+          {formStep === 1 && (
+            <>
           <div className="gradient-warm rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Music size={16} className="text-primary" />
-              The Soundtrack
-            </div>
+            <FieldLabel
+              label="Song"
+              help="The song and artist connected to this memory."
+            >
+              <span className="flex items-center gap-2"><Music size={16} className="text-primary" /> Song</span>
+            </FieldLabel>
             <SongSearch
               songTitle={songTitle}
               artist={artist}
@@ -497,7 +627,12 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">When was this?</label>
+            <FieldLabel
+              label="Date"
+              help="Use the season and year if you do not remember the exact date."
+            >
+              Date
+            </FieldLabel>
             <div className="grid grid-cols-2 gap-2">
               <select
                 value={memorySeason}
@@ -519,24 +654,34 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
               />
             </div>
           </div>
+            </>
+          )}
 
+          {formStep === 2 && (
+            <>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              <span className="flex items-center gap-1.5"><MapPin size={14} className="text-primary" /> Where was this?</span>
-            </label>
+            <FieldLabel
+              label="Place"
+              help="Add a location if this memory belongs on the map."
+            >
+              <span className="flex items-center gap-1.5"><MapPin size={14} className="text-primary" /> Place</span>
+            </FieldLabel>
             <LocationSearch value={locationName} onChange={updateLocation} maxLength={120} />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">
-              <span className="flex items-center gap-1.5"><Users size={14} className="text-primary" /> Who was there?</span>
-            </label>
+            <FieldLabel
+              label="People"
+              help="Add anyone who was part of the memory."
+            >
+              <span className="flex items-center gap-1.5"><Users size={14} className="text-primary" /> People</span>
+            </FieldLabel>
             <div className="flex gap-2 mb-2">
               <input
                 value={personInput}
                 onChange={(e) => setPersonInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPerson(); } }}
-                placeholder="Add a name..."
+                placeholder="Name"
                 className="flex-1 rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <button
@@ -560,9 +705,14 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">How did it feel?</label>
+            <FieldLabel
+              label="Mood"
+              help="Pick the main feeling, then add more if needed."
+            >
+              Mood
+            </FieldLabel>
             <p className="text-xs text-muted-foreground mb-2">
-              {selectedMoods.length === 0 ? "Pick your primary mood" : "Tap more to layer feelings"}
+              {selectedMoods.length === 0 ? "Pick one to start" : "Add more if needed"}
             </p>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {MOODS.map((m) => {
@@ -602,7 +752,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
                 value={customMoodInput}
                 onChange={(e) => setCustomMoodInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomMood(); } }}
-                placeholder="Create a custom mood…"
+                placeholder="Custom mood"
                 className="flex-1 rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <button
@@ -618,7 +768,12 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
           {/* Memory Type Tags */}
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">What kind of memory was this?</label>
+            <FieldLabel
+              label="Type"
+              help="Tag the kind of memory so it is easier to filter later."
+            >
+              Type
+            </FieldLabel>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {MEMORY_TYPES.map((tag) => {
                 const active = selectedTags.includes(tag);
@@ -656,7 +811,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
                 value={customTagInput}
                 onChange={(e) => setCustomTagInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTag(); } }}
-                placeholder="Add a custom tag…"
+                placeholder="Custom type"
                 className="flex-1 rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <button
@@ -671,7 +826,12 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">Visibility</label>
+            <FieldLabel
+              label="Visibility"
+              help="Choose whether this memory stays private or can appear in Discover."
+            >
+              Visibility
+            </FieldLabel>
             <div className="inline-flex rounded-full border border-border bg-card p-1">
               <button
                 type="button"
@@ -699,18 +859,41 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
               </button>
             </div>
           </div>
+            </>
+          )}
         </div>
         )}
 
         {stage === "form" && (
-          <button
-            type="submit"
-            disabled={!title || !songTitle || !artist || selectedMoods.length === 0 || uploading}
-            className="mt-6 w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {uploading && <Loader2 size={16} className="animate-spin" />}
-            {uploading ? "Uploading…" : editingMemory ? "Update Memory" : "Save Memory"}
-          </button>
+          <div className="mt-6 flex gap-2">
+            {formStep > 0 && (
+              <button
+                type="button"
+                onClick={goToPreviousStep}
+                className="flex-1 rounded-lg border border-border bg-card py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                Back
+              </button>
+            )}
+            {formStep < FORM_STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={goToNextStep}
+                className="flex-1 rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!title || !songTitle || !artist || selectedMoods.length === 0 || uploading}
+                className="flex-1 rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {uploading && <Loader2 size={16} className="animate-spin" />}
+                {uploading ? "Uploading…" : editingMemory ? "Update Memory" : "Save Memory"}
+              </button>
+            )}
+          </div>
         )}
       </form>
     </div>
