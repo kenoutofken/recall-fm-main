@@ -621,19 +621,19 @@ const Discover = () => {
         ) : (
           <div className="flex-1 min-h-0">
             {/* Carousel */}
-            <div className="relative overflow-hidden">
+            <div className="relative overflow-hidden rounded-lg">
               <div
-                className="flex gap-3 transition-transform duration-300 ease-out"
+                className="flex transition-transform duration-300 ease-out"
                 style={{
-                  height: "calc(100vh - 280px)",
-                  transform: `translateX(calc(-${currentIndex} * 100% - ${currentIndex} * 12px))`,
+                  height: "calc(100vh - 236px)",
+                  transform: `translateX(-${currentIndex * 100}%)`,
                 }}
               >
                 {filtered.map((mem, i) => (
                   <motion.div
                     key={mem.id}
                     className={cn(
-                      "min-w-0 shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full flex flex-col gap-2 overflow-hidden",
+                      "relative min-w-0 shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full overflow-hidden rounded-lg",
                       i === currentIndex ? "opacity-100" : "opacity-40"
                     )}
                     drag="x"
@@ -641,120 +641,114 @@ const Discover = () => {
                     dragElastic={0.4}
                     onDragEnd={handleDragEnd}
                   >
-                    <div
-                      className="min-w-0 max-w-full rounded-lg border border-border bg-card overflow-hidden grid flex-1 min-h-0 relative"
-                      style={{ gridTemplateRows: "1fr auto" }}
-                    >
-                      <div className={cn("w-full overflow-hidden min-h-0 relative", !mem.imageUrl && getMoodGradient(mem.mood))}>
-                        {mem.imageUrl && <img src={mem.imageUrl} alt="" className="size-full object-cover" />}
-                        {mem.locationName && (
-                          <div className="absolute left-2 top-2 z-20 flex max-w-[70%] min-w-0 overflow-hidden items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-                            <MapPin size={12} className="shrink-0" />
-                            <span className="block min-w-0 truncate">{mem.locationName}</span>
-                          </div>
-                        )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setExpandedMemory(mem); }}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className="absolute right-2 top-2 z-20 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                          aria-label="Open memory"
-                        >
-                          <Maximize2 size={18} />
-                        </button>
-                        <div className="absolute bottom-0 left-0 right-0 p-3" onClick={(e) => e.stopPropagation()}>
-                          <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} autoPlay={i === currentIndex} variant="overlay" />
-                        </div>
+                    <div className={cn("absolute inset-0", !mem.imageUrl && getMoodGradient(mem.mood))}>
+                      {mem.imageUrl && <img src={mem.imageUrl} alt="" className="size-full object-cover" />}
+                      <div className="absolute inset-0 bg-black/50" />
+                      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/88 via-black/45 to-transparent" />
+                    </div>
+
+                    {mem.locationName && (
+                      <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-4.5rem)] min-w-0 overflow-hidden items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                        <MapPin size={12} className="shrink-0" />
+                        <span className="block min-w-0 truncate">{mem.locationName}</span>
                       </div>
-                      <div className="min-w-0 max-w-full overflow-hidden px-5 py-4 flex flex-col">
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedMemory(mem); }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                      aria-label="Open memory"
+                    >
+                      <Maximize2 size={18} />
+                    </button>
+
+                    <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 space-y-4 p-4 text-white" onClick={(e) => e.stopPropagation()}>
+                      <div className="min-w-0">
                         {mem.username && (
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); showProfilePosts(mem); }}
-                            className="mb-2 w-fit text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                            className="mb-2 w-fit text-xs font-medium text-white/75 transition-colors hover:text-white"
                           >
                             @{mem.username}
                           </button>
                         )}
-                        <h3 className="min-w-0 max-w-full break-words font-display text-lg font-semibold leading-snug mb-2 text-foreground shrink-0">
+                        <h3 className="min-w-0 max-w-full break-words font-display text-2xl font-semibold leading-tight">
                           {mem.title}
                         </h3>
-                        <div className="flex min-w-0 items-center justify-between gap-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                            <Calendar size={12} />
-                            <span>{formatMemoryTime(mem)}</span>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-3">
-                              <button
-                                onClick={() => {
-                                  const wasLiked = userLikes.has(mem.id);
-                                  toggleLike(mem.id);
-                                  toast.success(wasLiked ? "Removed like" : "Liked this memory!");
-                                }}
-                                className={cn(
-                                  "flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors",
-                                  userLikes.has(mem.id) && "text-foreground"
-                                )}
-                              >
-                                <Heart
-                                  size={20}
-                                  className={userLikes.has(mem.id) ? "fill-foreground" : ""}
-                                />
-                                {(likeCounts[mem.id] || 0) > 0 && (
-                                  <span className="text-xs">{likeCounts[mem.id]}</span>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const inList = isSongInPlaylist(mem.songTitle, mem.artist);
-                                  if (inList) {
-                                    const song = songs.find(
-                                      (s) => s.songTitle.toLowerCase() === mem.songTitle.toLowerCase() && s.artist.toLowerCase() === mem.artist.toLowerCase()
-                                    );
-                                    if (song) {
-                                      removeSong(song.id);
-                                      toast.success("Removed from your playlist");
-                                    }
-                                  } else {
-                                    addSong(mem.songTitle, mem.artist, mem.id);
-                                    toast.success("Added to your playlist!");
-                                  }
-                                }}
-                                className={cn(
-                                  "text-muted-foreground hover:text-foreground transition-colors",
-                                  isSongInPlaylist(mem.songTitle, mem.artist) && "text-foreground"
-                                )}
-                              >
-                                <Bookmark
-                                  size={20}
-                                  className={isSongInPlaylist(mem.songTitle, mem.artist) ? "fill-foreground" : ""}
-                                />
-                              </button>
-                          </div>
+                        <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-white/72">
+                          <Calendar size={12} />
+                          <span>{formatMemoryTime(mem)}</span>
                         </div>
                       </div>
-                    </div>
-                    {i === currentIndex && (
-                      <div className="grid grid-cols-2 gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+
+                      <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} autoPlay={i === currentIndex} variant="overlay" />
+
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex shrink-0 items-center gap-3">
+                          <button
+                            onClick={() => {
+                              const wasLiked = userLikes.has(mem.id);
+                              toggleLike(mem.id);
+                              toast.success(wasLiked ? "Removed like" : "Liked this memory!");
+                            }}
+                            className={cn(
+                              "flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-white backdrop-blur-sm transition-colors hover:bg-black/70",
+                              userLikes.has(mem.id) && "text-white"
+                            )}
+                          >
+                            <Heart size={18} className={userLikes.has(mem.id) ? "fill-white" : ""} />
+                            {(likeCounts[mem.id] || 0) > 0 && (
+                              <span className="text-xs">{likeCounts[mem.id]}</span>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const inList = isSongInPlaylist(mem.songTitle, mem.artist);
+                              if (inList) {
+                                const song = songs.find(
+                                  (s) => s.songTitle.toLowerCase() === mem.songTitle.toLowerCase() && s.artist.toLowerCase() === mem.artist.toLowerCase()
+                                );
+                                if (song) {
+                                  removeSong(song.id);
+                                  toast.success("Removed from your playlist");
+                                }
+                              } else {
+                                addSong(mem.songTitle, mem.artist, mem.id);
+                                toast.success("Added to your playlist!");
+                              }
+                            }}
+                            className={cn(
+                              "flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70",
+                              isSongInPlaylist(mem.songTitle, mem.artist) && "text-white"
+                            )}
+                          >
+                            <Bookmark size={18} className={isSongInPlaylist(mem.songTitle, mem.artist) ? "fill-white" : ""} />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); goPrev(); }}
                           onPointerDown={(e) => e.stopPropagation()}
                           disabled={currentIndex === 0}
-                          className="h-11 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-card flex items-center justify-center gap-2"
+                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:opacity-35 disabled:hover:bg-black/55"
                         >
-                          <ChevronLeft size={18} />
-                          Previous
+                          <ChevronLeft size={16} />
+                          Prev
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); goNext(); }}
                           onPointerDown={(e) => e.stopPropagation()}
                           disabled={currentIndex >= filtered.length - 1}
-                          className="h-11 rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-card flex items-center justify-center gap-2"
+                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:opacity-35 disabled:hover:bg-black/55"
                         >
                           Next
-                          <ChevronRight size={18} />
+                          <ChevronRight size={16} />
                         </button>
                       </div>
-                    )}
+                    </div>
+                    </div>
                   </motion.div>
                 ))}
               </div>
