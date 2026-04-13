@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface MemoryDetailModalProps {
   memory: Memory | null;
@@ -25,11 +26,12 @@ const MemoryDetailModal = ({ memory, open, onOpenChange, onDelete, onEdit }: Mem
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] min-w-0 overflow-hidden p-0 sm:max-w-md [&>button]:z-50 [&>button]:flex [&>button]:h-9 [&>button]:w-9 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full [&>button]:bg-black/55 [&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:ring-offset-0 [&>button]:transition-colors [&>button:hover]:bg-black/70">
+      <DialogContent className="h-full max-h-full w-full min-w-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[85vh] sm:w-[calc(100vw-2rem)] sm:max-w-md sm:rounded-lg [&>button]:z-50 [&>button]:flex [&>button]:h-9 [&>button]:w-9 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full [&>button]:bg-black/55 [&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:ring-offset-0 [&>button]:transition-colors [&>button:hover]:bg-black/70">
+        <div className="h-full min-w-0 overflow-y-auto sm:h-auto">
         {memory.imageUrl && (
           <img src={memory.imageUrl} alt="" className="w-full h-48 object-cover" />
         )}
-        <div className="min-w-0 p-5 space-y-4">
+        <div className="min-w-0 p-5 pt-12 space-y-4 sm:pt-5">
           <DialogHeader className="min-w-0 space-y-1">
             <DialogTitle className="min-w-0 break-words font-display text-lg leading-snug">{memory.title}</DialogTitle>
             {memory.description && (
@@ -83,30 +85,67 @@ const MemoryDetailModal = ({ memory, open, onOpenChange, onDelete, onEdit }: Mem
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="space-y-4">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Calendar size={12} />
               <span>{formatMemoryTime(memory)}</span>
             </div>
-            <div className="flex gap-1">
+            <div className="grid grid-cols-2 gap-2">
               {onEdit && (
                 <button
                   onClick={() => { onOpenChange(false); onEdit(memory); }}
-                  className="text-muted-foreground hover:text-foreground p-1.5 rounded-full transition-colors"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                   aria-label="Edit memory"
                 >
-                  <Pencil size={15} />
+                  <Pencil size={16} />
+                  Edit
                 </button>
               )}
-              <button
-                onClick={() => { onOpenChange(false); onDelete(memory.id); }}
-                className="text-muted-foreground hover:text-destructive p-1.5 rounded-full transition-colors"
-                aria-label="Delete memory"
-              >
-                <Trash2 size={15} />
-              </button>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    aria-label="Delete memory"
+                  >
+                    <Trash2 size={16} />
+                    Delete
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="flex w-[86vw] max-w-sm flex-col p-0">
+                  <SheetHeader className="border-b border-border px-5 py-5 text-left">
+                    <SheetTitle>Delete this memory?</SheetTitle>
+                  </SheetHeader>
+                  <div className="flex flex-1 flex-col justify-between gap-6 px-5 py-5">
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      This will permanently remove "{memory.title}" from your journal.
+                    </p>
+                    <div className="grid gap-2">
+                      <SheetClose asChild>
+                        <button
+                          type="button"
+                          className="h-11 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                        >
+                          Cancel
+                        </button>
+                      </SheetClose>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenChange(false);
+                          onDelete(memory.id);
+                        }}
+                        className="h-11 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                      >
+                        Delete Memory
+                      </button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>

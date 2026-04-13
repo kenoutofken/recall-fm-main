@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
 import Discover from "./pages/Discover";
+import JournalMemoryDetail from "./pages/JournalMemoryDetail";
 import Playlist from "./pages/Playlist";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
             <Route path="/journal" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/journal/memories/:id" element={<ProtectedRoute><JournalMemoryDetail /></ProtectedRoute>} />
             <Route path="/playlist" element={<ProtectedRoute><Playlist /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

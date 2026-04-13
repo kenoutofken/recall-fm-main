@@ -1,7 +1,9 @@
-import { Memory } from "@/types/memory";
-import { Calendar, Trash2, Users, Pencil, Maximize2, MapPin } from "lucide-react";
+import { Memory, MOODS } from "@/types/memory";
+import { Calendar, Trash2, Users, MapPin } from "lucide-react";
 import MiniPlayer from "@/components/MiniPlayer";
 import { formatMemoryTime } from "@/lib/memoryTime";
+import { cn } from "@/lib/utils";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface MemoryCardProps {
   memory: Memory;
@@ -11,79 +13,126 @@ interface MemoryCardProps {
   index: number;
 }
 
-const MemoryCard = ({ memory, onDelete, onEdit, onClick }: MemoryCardProps) => {
-  const actionButtonClass = "flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70";
+const MOOD_GRADIENTS: Record<string, string> = {
+  Joyful: "bg-gradient-to-br from-amber-300 to-orange-400",
+  Melancholy: "bg-gradient-to-br from-slate-400 to-blue-500",
+  Energized: "bg-gradient-to-br from-red-400 to-rose-500",
+  Nostalgic: "bg-gradient-to-br from-indigo-400 to-purple-500",
+  Peaceful: "bg-gradient-to-br from-pink-300 to-rose-300",
+  Bittersweet: "bg-gradient-to-br from-orange-400 to-amber-600",
+};
+
+const getMoodGradient = (mood: string) => {
+  const first = mood.split(",")[0].trim();
+  const label = MOODS.find((m) => first.includes(m.label))?.label ?? "Nostalgic";
+  return MOOD_GRADIENTS[label] ?? "bg-gradient-to-br from-muted to-muted-foreground/20";
+};
+
+const MemoryCard = ({ memory, onDelete, onClick }: MemoryCardProps) => {
+  const moodParts = memory.mood.split(",").map((mood) => mood.trim()).filter(Boolean);
 
   return (
-    <div className="group relative rounded-lg border border-border bg-card overflow-hidden transition-all hover:shadow-md">
+    <div
+      className={cn(
+        "group relative h-72 overflow-hidden rounded-lg border border-border bg-card text-white transition-all hover:shadow-md",
+        onClick && "cursor-pointer"
+      )}
+      onClick={() => onClick?.(memory)}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(memory);
+        }
+      }}
+    >
+      <div className={cn("absolute inset-0", !memory.imageUrl && getMoodGradient(memory.mood))}>
+        {memory.imageUrl && <img src={memory.imageUrl} alt="" className="size-full object-cover" />}
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/88 via-black/48 to-transparent" />
+      </div>
+
       <div className="absolute right-3 top-3 z-10 flex gap-2">
-        {onClick && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onClick(memory); }}
-            className={actionButtonClass}
-            aria-label="Open memory"
-          >
-            <Maximize2 size={19} />
-          </button>
-        )}
-        {onEdit && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(memory); }}
-            className={actionButtonClass}
-            aria-label="Edit memory"
-          >
-            <Pencil size={19} />
-          </button>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(memory.id); }}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
-          aria-label="Delete memory"
-        >
-          <Trash2 size={19} />
-        </button>
+        <Sheet>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
+              aria-label="Delete memory"
+            >
+              <Trash2 size={19} />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="right" onClick={(e) => e.stopPropagation()} className="flex w-[86vw] max-w-sm flex-col p-0">
+            <SheetHeader className="border-b border-border px-5 py-5 text-left">
+              <SheetTitle>Delete this memory?</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-1 flex-col justify-between gap-6 px-5 py-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                This will permanently remove "{memory.title}" from your journal.
+              </p>
+              <div className="grid gap-2">
+                <SheetClose asChild>
+                  <button
+                    type="button"
+                    className="h-11 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                </SheetClose>
+                <button
+                  type="button"
+                  onClick={() => onDelete(memory.id)}
+                  className="h-11 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                >
+                  Delete Memory
+                </button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
-      {memory.imageUrl && (
-        <img src={memory.imageUrl} alt="" className="w-full h-40 object-cover" />
-      )}
+      <div className="absolute inset-x-0 bottom-0 z-10 space-y-3 p-4">
+        <div className="space-y-2">
+          {moodParts.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {moodParts.slice(0, 3).map((mood) => (
+                <span key={mood} className="rounded-full border border-white/15 bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                  {mood}
+                </span>
+              ))}
+            </div>
+          )}
 
-      <div className="p-5">
-
-      <h3 className="font-display text-lg font-semibold leading-snug text-foreground mb-2">
-        {memory.title}
-      </h3>
-
-      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-        {memory.description}
-      </p>
-
-      <div className="mb-3">
-        <MiniPlayer songTitle={memory.songTitle} artist={memory.artist} />
-      </div>
-
-      {memory.people.length > 0 && (
-        <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-          <Users size={12} className="text-muted-foreground shrink-0" />
-          {memory.people.map((p) => (
-            <span key={p} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-foreground border border-primary/20">
-              {p}
-            </span>
-          ))}
+          <h3 className="font-display text-xl font-semibold leading-tight text-white">
+            {memory.title}
+          </h3>
         </div>
-      )}
 
-      {memory.locationName && (
-        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground mb-3">
-          <MapPin size={12} className="shrink-0" />
-          <span className="min-w-0 truncate">{memory.locationName}</span>
+        <MiniPlayer songTitle={memory.songTitle} artist={memory.artist} variant="overlay" />
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-white/72">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={12} />
+            <span>{formatMemoryTime(memory)}</span>
+          </div>
+          {memory.locationName && (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <MapPin size={12} className="shrink-0" />
+              <span className="min-w-0 truncate">{memory.locationName}</span>
+            </div>
+          )}
+          {memory.people.length > 0 && (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Users size={12} className="shrink-0" />
+              <span className="min-w-0 truncate">{memory.people.slice(0, 2).join(", ")}{memory.people.length > 2 ? ` +${memory.people.length - 2}` : ""}</span>
+            </div>
+          )}
         </div>
-      )}
-
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Calendar size={12} />
-        <span>{formatMemoryTime(memory)}</span>
-      </div>
       </div>
     </div>
   );

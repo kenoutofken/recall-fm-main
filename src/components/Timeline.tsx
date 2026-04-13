@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Memory } from "@/types/memory";
 import MemoryCard from "@/components/MemoryCard";
 import MemoryListItem from "@/components/MemoryListItem";
-import MemoryDetailModal from "@/components/MemoryDetailModal";
 import { Button } from "@/components/ui/button";
 import { formatMemoryTime, seasonFromDate, yearFromDate } from "@/lib/memoryTime";
 
@@ -20,7 +20,7 @@ interface TimelineProps {
 
 const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelineProps) => {
   const [expandedMonths, setExpandedMonths] = useState<Record<string, number>>({});
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const navigate = useNavigate();
 
   const sorted = useMemo(() => {
     return [...memories].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -60,7 +60,7 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
         </p>
       ) : (
         <div className="relative">
-          <div className="absolute left-[15px] top-0 bottom-0 w-px bg-border" />
+          <div className="absolute left-[15px] top-0 bottom-0 w-px bg-primary/70" />
 
           {grouped.map(([monthKey, items]) => {
             const visibleCount = getVisibleCount(monthKey, items.length);
@@ -93,16 +93,16 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
                       transition={{ duration: 0.25, delay: i * 0.03 }}
                     >
                       <div className="relative">
-                        <div className={`absolute -left-[27px] ${viewMode === "list" ? "top-3" : "top-5"} h-2 w-2 rounded-full bg-muted-foreground/40`} />
+                        <div className={`absolute -left-[27px] ${viewMode === "list" ? "top-3" : "top-5"} h-2 w-2 rounded-full bg-primary`} />
                         {viewMode === "list" ? (
                           <MemoryListItem
                             memory={memory}
                             onDelete={onDelete}
                             onEdit={onEdit}
-                            onClick={setSelectedMemory}
+                            onClick={(selected) => navigate(`/journal/memories/${selected.id}`)}
                           />
                         ) : (
-                          <MemoryCard memory={memory} onDelete={onDelete} onEdit={onEdit} onClick={setSelectedMemory} index={0} />
+                          <MemoryCard memory={memory} onDelete={onDelete} onEdit={onEdit} onClick={(selected) => navigate(`/journal/memories/${selected.id}`)} index={0} />
                         )}
                       </div>
                     </motion.div>
@@ -124,13 +124,6 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
         </div>
       )}
 
-      <MemoryDetailModal
-        memory={selectedMemory}
-        open={!!selectedMemory}
-        onOpenChange={(open) => { if (!open) setSelectedMemory(null); }}
-        onDelete={onDelete}
-        onEdit={onEdit}
-      />
     </div>
   );
 };

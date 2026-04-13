@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatMemoryTime } from "@/lib/memoryTime";
 
 const SWIPE_THRESHOLD = 60;
@@ -944,13 +945,13 @@ const Discover = () => {
           </DialogContent>
         </Dialog>
       )}
-      <Dialog open={showUserSearch} onOpenChange={setShowUserSearch}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Find Users</DialogTitle>
-          </DialogHeader>
+      <Sheet open={showUserSearch} onOpenChange={setShowUserSearch}>
+        <SheetContent side="bottom" className="flex h-[85vh] flex-col rounded-t-2xl p-0 sm:h-[70vh]">
+          <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5 text-left">
+            <SheetTitle className="font-display">Find Users</SheetTitle>
+          </SheetHeader>
 
-          <div className="space-y-4">
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -1013,8 +1014,8 @@ const Discover = () => {
               )}
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
       <AISuggestDrawer
         open={showAISuggest}
         onOpenChange={setShowAISuggest}

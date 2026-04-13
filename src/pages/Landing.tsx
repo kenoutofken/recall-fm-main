@@ -58,7 +58,7 @@ const Landing = ({ onGetStarted, onSignIn }: LandingProps) => {
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-black/55" />
-              <div className="relative z-10 flex min-h-screen flex-col justify-end px-6 pb-56 pt-20 text-left">
+              <div className="relative z-10 flex min-h-screen flex-col items-center justify-end px-6 pb-56 pt-20 text-center">
                 <div className="w-full max-w-sm">
                   <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
                     Recall.fm
@@ -66,7 +66,7 @@ const Landing = ({ onGetStarted, onSignIn }: LandingProps) => {
                   <h2 className="font-display text-4xl font-semibold leading-tight text-white">
                     {slide.title}
                   </h2>
-                  <p className="mt-4 max-w-[310px] text-base leading-relaxed text-white/78">
+                  <p className="mx-auto mt-4 max-w-[310px] text-base leading-relaxed text-white/78">
                     {slide.description}
                   </p>
                 </div>

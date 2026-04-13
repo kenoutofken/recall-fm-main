@@ -9,6 +9,7 @@ import { dateFromYearSeason, seasonFromDate, yearFromDate } from "@/lib/memoryTi
 import { toast } from "sonner";
 import LocationSearch, { type LocationResult } from "@/components/LocationSearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 import { Memory } from "@/types/memory";
 
@@ -390,13 +391,21 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-0 sm:p-4"
+      className={cn(
+        "fixed inset-0 z-50 flex bg-foreground/30 backdrop-blur-sm",
+        editingMemory ? "items-stretch justify-start p-0" : "items-end justify-center p-0 sm:p-4"
+      )}
       onClick={onClose}
     >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-background p-6 shadow-xl animate-in slide-in-from-bottom duration-500 sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl"
+        className={cn(
+          "overflow-y-auto bg-background p-6 shadow-xl animate-in duration-500",
+          editingMemory
+            ? "h-full max-h-full w-[90vw] max-w-lg rounded-r-2xl slide-in-from-left"
+            : "h-[92dvh] w-full rounded-t-2xl slide-in-from-bottom sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl"
+        )}
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-xl font-semibold">
@@ -485,36 +494,38 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
               Back to AI Fill
             </button>
           )}
+          {!editingMemory && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                Step {editingMemory ? formStep + 1 : formStep + 2} of {editingMemory ? FORM_STEPS.length : FLOW_STEPS.length}
+                Step {formStep + 2} of {FLOW_STEPS.length}
               </span>
               <span>{FORM_STEPS[formStep]}</span>
             </div>
-            <div className={`grid gap-1 ${editingMemory ? "grid-cols-3" : "grid-cols-4"}`}>
-              {(!editingMemory ? FLOW_STEPS : FORM_STEPS).map((step, index) => (
+            <div className="grid grid-cols-4 gap-1">
+              {FLOW_STEPS.map((step, index) => (
                 <button
                   key={step}
                   type="button"
                   onClick={() => {
-                    if (!editingMemory && index === 0) {
+                    if (index === 0) {
                       setStage("ai");
                       setFormStep(0);
                       return;
                     }
-                    setFormStep((editingMemory ? index : index - 1) as FormStep);
+                    setFormStep((index - 1) as FormStep);
                   }}
                   className={`h-1.5 rounded-full transition-colors ${
-                    index <= (editingMemory ? formStep : formStep + 1) ? "bg-primary" : "bg-muted"
+                    index <= formStep + 1 ? "bg-primary" : "bg-muted"
                   }`}
                   aria-label={`Go to ${step}`}
                 />
               ))}
             </div>
           </div>
+          )}
 
-          {formStep === 0 && (
+          {(editingMemory || formStep === 0) && (
             <>
           <div>
             <div className="mb-1 flex items-center justify-between gap-3">
@@ -608,7 +619,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
             </>
           )}
 
-          {formStep === 1 && (
+          {(editingMemory || formStep === 1) && (
             <>
           <div className="gradient-warm rounded-lg p-4 space-y-3">
             <FieldLabel
@@ -657,7 +668,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
             </>
           )}
 
-          {formStep === 2 && (
+          {(editingMemory || formStep === 2) && (
             <>
           <div>
             <FieldLabel
@@ -866,7 +877,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
         {stage === "form" && (
           <div className="mt-6 flex gap-2">
-            {formStep > 0 && (
+            {!editingMemory && formStep > 0 && (
               <button
                 type="button"
                 onClick={goToPreviousStep}
@@ -875,7 +886,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
                 Back
               </button>
             )}
-            {formStep < FORM_STEPS.length - 1 ? (
+            {!editingMemory && formStep < FORM_STEPS.length - 1 ? (
               <button
                 type="button"
                 onClick={goToNextStep}

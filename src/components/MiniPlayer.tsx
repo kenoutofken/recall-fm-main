@@ -83,10 +83,10 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
     if (!autoPlay) {
       userPausedAutoRef.current = false;
     }
-    if (!autoPlay && (autoStartedRef.current || isOverlay) && audioRef.current && playing) {
+    if (!autoPlay && autoStartedRef.current && audioRef.current && playing) {
       stopPlayback();
     }
-  }, [autoPlay, track, playing, startPlayback, stopPlayback, isOverlay]);
+  }, [autoPlay, track, playing, startPlayback, stopPlayback]);
 
   useEffect(() => {
     userPausedAutoRef.current = false;
@@ -115,6 +115,16 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
     }
   };
 
+  const handleTogglePlay = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    togglePlay();
+  };
+
+  const handleToggleMuted = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setMuted((current) => !current);
+  };
+
   const updateProgress = useCallback(() => {
     if (audioRef.current) {
       const pct = (audioRef.current.currentTime / audioRef.current.duration) * 100;
@@ -140,6 +150,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
   };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
     if (!audioRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
@@ -195,7 +206,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
       <>
         <button
           type="button"
-          onClick={togglePlay}
+          onClick={handleTogglePlay}
           className="h-8 w-8 rounded-full flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           aria-label={playing ? "Pause preview" : "Play preview"}
         >
@@ -228,14 +239,16 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
-            onClick={() => setMuted(!muted)}
+            type="button"
+            onClick={handleToggleMuted}
             className={cn("transition-colors p-1", isOverlay ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground")}
             aria-label={muted ? "Unmute" : "Mute"}
           >
             {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
           <button
-            onClick={togglePlay}
+            type="button"
+            onClick={handleTogglePlay}
             className={cn(
               "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
               isOverlay ? "bg-white text-black hover:bg-white/90" : "bg-primary text-primary-foreground hover:bg-primary/90"
