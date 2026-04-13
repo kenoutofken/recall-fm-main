@@ -147,12 +147,15 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
       </div>
 
       {open && suggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
           {suggestions.map((suggestion) => (
             <button
               key={suggestion.placeId ?? `${suggestion.lat}:${suggestion.lng}:${suggestion.name}`}
               type="button"
-              onClick={() => selectSuggestion(suggestion)}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                selectSuggestion(suggestion);
+              }}
               className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-muted"
             >
               <MapPin size={14} className="mt-0.5 shrink-0 text-primary" />
