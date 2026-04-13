@@ -28,19 +28,21 @@ const JournalMemoryDetail = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/journal")}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ChevronLeft size={18} />
-            Journal
-          </button>
+          <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
           <UserAvatar />
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-5 pb-24">
+      <main className="max-w-lg mx-auto px-4 py-4 pb-24">
+        <button
+          type="button"
+          onClick={() => navigate("/journal")}
+          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronLeft size={18} />
+          Journal
+        </button>
+
         {loading ? (
           <p className="text-center text-sm text-muted-foreground py-20">Loading memory...</p>
         ) : !memory ? (

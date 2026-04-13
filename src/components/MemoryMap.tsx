@@ -344,13 +344,13 @@ const MemoryMap = ({ memories, onDelete, onEdit }: MemoryMapProps) => {
           <div className="absolute inset-0 bg-muted" />
         )}
 
-        {positionedPoints.map((point) => (
+        {positionedPoints.map((point, index) => (
           <button
             key={point.memory.id}
             type="button"
             onClick={() => setSelectedMemory(point.memory)}
-            className="absolute -translate-x-1/2 -translate-y-full rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-md ring-2 ring-background"
-            style={{ left: point.left, top: point.top }}
+            className="absolute -translate-x-1/2 -translate-y-full rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-md ring-2 ring-background transition-all hover:scale-105 hover:bg-primary/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ left: point.left, top: point.top, zIndex: positionedPoints.length - index }}
           >
             <span className="flex items-center gap-1">
               <MapPin size={13} />
@@ -359,7 +359,7 @@ const MemoryMap = ({ memories, onDelete, onEdit }: MemoryMapProps) => {
           </button>
         ))}
 
-        <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+        <div className="absolute right-3 top-3 z-[1000] flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
           <button
             type="button"
             onClick={() => changeZoom(zoom + 1)}
@@ -388,12 +388,12 @@ const MemoryMap = ({ memories, onDelete, onEdit }: MemoryMapProps) => {
           </button>
         </div>
 
-        <div className="absolute bottom-3 left-3 rounded-lg border border-border bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
+        <div className="absolute bottom-3 left-3 z-[1000] rounded-lg border border-border bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
           {points.length} {points.length === 1 ? "pin" : "pins"} · zoom {zoom}
         </div>
 
         {!apiKey && (
-          <div className="absolute bottom-3 left-3 right-3 rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
+          <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
             Add VITE_GEOAPIFY_API_KEY to .env and restart the dev server to load map tiles.
           </div>
         )}

@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 
-import { Search, SlidersHorizontal, X, LayoutGrid, List, Map } from "lucide-react";
+import { ArrowUpDown, Search, SlidersHorizontal, X, LayoutGrid, List, Map } from "lucide-react";
 import { useMemories } from "@/hooks/useMemories";
 
 import { Memory } from "@/types/memory";
-import Timeline, { ViewMode } from "@/components/Timeline";
+import Timeline, { MemorySortMode, ViewMode, sortMemories } from "@/components/Timeline";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import MemoryMap from "@/components/MemoryMap";
 import BottomNav from "@/components/BottomNav";
@@ -16,6 +16,23 @@ import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { matchesLocationFilter } from "@/lib/locationFilter";
 import type { LocationResult } from "@/components/LocationSearch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const SORT_LABELS: Record<MemorySortMode, string> = {
+  newest: "Newest on top",
+  oldest: "Oldest on top",
+  title: "Memory name",
+  song: "Song name",
+  artist: "Artist name",
+};
 
 const Index = () => {
   const { memories, loading, addMemory, updateMemory, deleteMemory } = useMemories();
@@ -31,6 +48,13 @@ const Index = () => {
   const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [sortMode, setSortMode] = useState<MemorySortMode>("newest");
+
+  useEffect(() => {
+    if (viewMode !== "list" && ["title", "song", "artist"].includes(sortMode)) {
+      setSortMode("newest");
+    }
+  }, [sortMode, viewMode]);
 
   const toggleMood = (mood: string) => {
     setSelectedMoods((prev) =>
@@ -86,6 +110,9 @@ const Index = () => {
           m.title.toLowerCase().includes(q) ||
           m.songTitle.toLowerCase().includes(q) ||
           m.artist.toLowerCase().includes(q) ||
+          m.mood.toLowerCase().includes(q) ||
+          (m.locationName?.toLowerCase().includes(q) ?? false) ||
+          m.tags.some((tag) => tag.toLowerCase().includes(q)) ||
           m.people.some((p) => p.toLowerCase().includes(q))
       );
     }
@@ -121,13 +148,17 @@ const Index = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, sortMode]);
+
+  const sortedFiltered = useMemo(() => {
+    return sortMemories(filtered, sortMode);
+  }, [filtered, sortMode]);
 
   const paginatedMemories = useMemo(() => {
-    return filtered.slice(0, page * POSTS_PER_PAGE);
-  }, [filtered, page]);
+    return sortedFiltered.slice(0, page * POSTS_PER_PAGE);
+  }, [sortedFiltered, page]);
 
-  const hasMorePages = paginatedMemories.length < filtered.length;
+  const hasMorePages = paginatedMemories.length < sortedFiltered.length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -155,6 +186,36 @@ const Index = () => {
               </button>
             )}
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="relative shrink-0"
+                aria-label={`Sort memories by ${SORT_LABELS[sortMode]}`}
+              >
+                <ArrowUpDown size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={sortMode}
+                onValueChange={(value) => setSortMode(value as MemorySortMode)}
+              >
+                <DropdownMenuRadioItem value="newest">Newest on top</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="oldest">Oldest on top</DropdownMenuRadioItem>
+                {viewMode === "list" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioItem value="title">Memory name</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="song">Song name</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="artist">Artist name</DropdownMenuRadioItem>
+                  </>
+                )}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant={showFilters ? "secondary" : "outline"}
             size="icon"
@@ -196,22 +257,22 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">
                 {filtered.length} {filtered.length === 1 ? "memory" : "memories"} {hasActiveFilters ? "found" : "saved"}
               </p>
-              <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+              <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-1">
                 <button
                   onClick={() => setViewMode("cards")}
                   className={cn(
-                    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
-                  aria-label="Card view"
+                  aria-label="Timeline view"
                 >
                   <LayoutGrid size={14} />
-                  <span>Cards</span>
+                  <span>Timeline</span>
                 </button>
                 <button
                   onClick={() => setViewMode("list")}
                   className={cn(
-                    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-label="List view"
@@ -222,7 +283,7 @@ const Index = () => {
                 <button
                   onClick={() => setViewMode("map")}
                   className={cn(
-                    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-label="Map view"
@@ -233,9 +294,9 @@ const Index = () => {
               </div>
             </div>
             {viewMode === "map" ? (
-              <MemoryMap memories={filtered} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} />
+              <MemoryMap memories={sortedFiltered} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} />
             ) : (
-              <Timeline memories={paginatedMemories} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} viewMode={viewMode} />
+              <Timeline memories={paginatedMemories} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} viewMode={viewMode} sortMode={sortMode} />
             )}
             {viewMode !== "map" && hasMorePages && (
               <Button

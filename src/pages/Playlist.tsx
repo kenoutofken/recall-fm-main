@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePlaylist } from "@/hooks/usePlaylist";
 import { Trash2, Copy, ExternalLink, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { useMemories } from "@/hooks/useMemories";
 import { toast } from "sonner";
 import MiniPlayer from "@/components/MiniPlayer";
 
-const TUNEMYMUSIC_URL = "https://www.tunemymusic.com/";
+const TUNEMYMUSIC_URL = "https://www.tunemymusic.com/transfer";
 
 const Playlist = () => {
   const { songs, loading, removeSong } = usePlaylist();
@@ -17,8 +17,9 @@ const Playlist = () => {
   const [showForm, setShowForm] = useState(false);
   const [copied, setCopied] = useState(false);
 
-
-
+  const playlistText = useMemo(() => {
+    return songs.map((s) => `${s.songTitle} - ${s.artist}`).join("\n");
+  }, [songs]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -36,32 +37,52 @@ const Playlist = () => {
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4 pb-24">
         {/* TuneMyMusic Export Card */}
         {songs.length > 0 && (
-          <div className="rounded-lg border border-border bg-card p-4 mb-4">
+          <div className="rounded-lg border border-border bg-card p-4 mb-4 space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <span className="text-lg">🎵</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Export to Spotify, Apple Music & more</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">Transfer with TuneMyMusic</p>
                 <p className="text-xs text-muted-foreground">
-                  One tap copies your playlist & opens TuneMyMusic — just paste and go
+                  Copy this song list, then paste it into TuneMyMusic's text import.
                 </p>
               </div>
             </div>
+
+            <div className="rounded-lg border border-border bg-background p-3">
+              <p className="mb-2 text-xs font-medium text-foreground">What gets copied</p>
+              <textarea
+                readOnly
+                value={playlistText}
+                rows={Math.min(6, Math.max(3, songs.length))}
+                className="w-full resize-none rounded-md border border-input bg-card px-3 py-2 text-xs leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                aria-label="Song list to paste into TuneMyMusic"
+              />
+            </div>
+
+            <div className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+              <p className="font-medium text-foreground">How to import</p>
+              <p>1. Copy the song list above.</p>
+              <p>2. Open TuneMyMusic and start a New Transfer.</p>
+              <p>3. Choose Free text as the source, paste the list, then pick Spotify, Apple Music, or another destination.</p>
+            </div>
+
             <Button
               size="sm"
               onClick={() => {
-                const text = songs.map((s) => `${s.songTitle} - ${s.artist}`).join("\n");
-                navigator.clipboard.writeText(text).then(() => {
+                navigator.clipboard.writeText(playlistText).then(() => {
                   setCopied(true);
-                  toast.success("Playlist copied! Paste it into the text box on TuneMyMusic.");
+                  toast.success("Playlist copied. Paste it into TuneMyMusic's text import.");
                   setTimeout(() => {
                     window.open(TUNEMYMUSIC_URL, "_blank");
                   }, 400);
                   setTimeout(() => setCopied(false), 3000);
+                }).catch(() => {
+                  toast.error("Could not copy playlist. Select the song list and copy it manually.");
                 });
               }}
-              className="gap-1.5 mt-3 w-full"
+              className="gap-1.5 w-full"
               variant={copied ? "secondary" : "default"}
             >
               {copied ? <Check size={14} /> : <><Copy size={14} /> <ExternalLink size={14} /></>}

@@ -10,21 +10,45 @@ import { formatMemoryTime, seasonFromDate, yearFromDate } from "@/lib/memoryTime
 const ITEMS_PER_PAGE = 10;
 
 export type ViewMode = "cards" | "list" | "map";
+export type MemorySortMode = "newest" | "oldest" | "title" | "song" | "artist";
+
+export const sortMemories = (memories: Memory[], sortMode: MemorySortMode) => {
+  return [...memories].sort((a, b) => {
+    if (sortMode === "oldest") {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    }
+
+    if (sortMode === "title") {
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    }
+
+    if (sortMode === "song") {
+      return a.songTitle.localeCompare(b.songTitle, undefined, { sensitivity: "base" });
+    }
+
+    if (sortMode === "artist") {
+      return a.artist.localeCompare(b.artist, undefined, { sensitivity: "base" });
+    }
+
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+};
 
 interface TimelineProps {
   memories: Memory[];
   onDelete: (id: string) => void;
   onEdit?: (memory: Memory) => void;
   viewMode?: ViewMode;
+  sortMode?: MemorySortMode;
 }
 
-const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelineProps) => {
+const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards", sortMode = "newest" }: TimelineProps) => {
   const [expandedMonths, setExpandedMonths] = useState<Record<string, number>>({});
   const navigate = useNavigate();
 
   const sorted = useMemo(() => {
-    return [...memories].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [memories]);
+    return sortMemories(memories, sortMode);
+  }, [memories, sortMode]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Memory[]>();
@@ -35,9 +59,7 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(m);
     });
-    return Array.from(map.entries()).sort(([, aItems], [, bItems]) => {
-      return new Date(bItems[0].date).getTime() - new Date(aItems[0].date).getTime();
-    });
+    return Array.from(map.entries());
   }, [sorted]);
 
   const getVisibleCount = (monthKey: string, total: number) => {
@@ -51,6 +73,37 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards" }: TimelinePr
       [monthKey]: (prev[monthKey] ?? 0) + ITEMS_PER_PAGE,
     }));
   };
+
+  if (viewMode === "list") {
+    return (
+      <div>
+        {sorted.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground py-10">
+            No memories for this period.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {sorted.map((memory, i) => (
+              <motion.div
+                key={memory.id}
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.2, delay: i * 0.02 }}
+              >
+                <MemoryListItem
+                  memory={memory}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  onClick={(selected) => navigate(`/journal/memories/${selected.id}`)}
+                />
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>

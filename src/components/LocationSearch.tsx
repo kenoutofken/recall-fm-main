@@ -30,6 +30,7 @@ type LocationSearchProps = {
   value: string;
   onChange: (value: string, location?: LocationResult | null) => void;
   maxLength?: number;
+  menuPlacement?: "top" | "bottom";
 };
 
 const GEOAPIFY_AUTOCOMPLETE_URL = "https://api.geoapify.com/v1/geocode/autocomplete";
@@ -69,23 +70,26 @@ const normalizeSuggestions = (features: GeoapifyFeature[] = []) => (
     .slice(0, 5)
 );
 
-const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProps) => {
+const LocationSearch = ({ value, onChange, maxLength = 120, menuPlacement = "bottom" }: LocationSearchProps) => {
   const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
   const [suggestions, setSuggestions] = useState<LocationResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (value.trim().length < 3) {
       setSuggestions([]);
       setLoading(false);
+      setStatusMessage(null);
       return;
     }
 
     const controller = new AbortController();
     const search = window.setTimeout(async () => {
       setLoading(true);
+      setStatusMessage(null);
 
       try {
         let nextSuggestions: LocationResult[] = [];
@@ -119,11 +123,14 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
         }
 
         setSuggestions(nextSuggestions);
-        setOpen(nextSuggestions.length > 0);
+        setStatusMessage(nextSuggestions.length > 0 ? null : "No locations found.");
+        setOpen(true);
       } catch (error) {
         if (!controller.signal.aborted) {
           console.error("Location search failed:", error);
           setSuggestions([]);
+          setStatusMessage("Location suggestions unavailable. You can still type a place.");
+          setOpen(true);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -147,8 +154,12 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
 
   const selectSuggestion = (suggestion: LocationResult) => {
     onChange(suggestion.name.slice(0, maxLength), suggestion);
+    setStatusMessage(null);
     setOpen(false);
   };
+
+  const menuPositionClass = menuPlacement === "top" ? "bottom-full mb-1" : "top-full mt-1";
+  const showMenu = open && (loading || suggestions.length > 0 || statusMessage);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -156,10 +167,11 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
         value={value}
         onChange={(event) => {
           onChange(event.target.value.slice(0, maxLength), null);
+          setStatusMessage(null);
           setOpen(true);
         }}
         onFocus={() => {
-          if (suggestions.length > 0) setOpen(true);
+          if (suggestions.length > 0 || statusMessage) setOpen(true);
         }}
         placeholder="e.g. Stanley Park, Vancouver"
         className="w-full rounded-lg border border-input bg-card px-3 py-2.5 pr-9 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -170,8 +182,14 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
         {loading ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
       </div>
 
-      {open && suggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+      {showMenu && (
+        <div className={`absolute left-0 right-0 z-50 overflow-hidden rounded-lg border border-border bg-popover shadow-lg ${menuPositionClass}`}>
+          {loading && suggestions.length === 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+              <Loader2 size={14} className="animate-spin" />
+              Searching places...
+            </div>
+          )}
           {suggestions.map((suggestion) => (
             <button
               key={suggestion.placeId ?? `${suggestion.lat}:${suggestion.lng}:${suggestion.name}`}
@@ -186,6 +204,11 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
               <span className="line-clamp-2">{suggestion.name}</span>
             </button>
           ))}
+          {!loading && suggestions.length === 0 && statusMessage && (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {statusMessage}
+            </div>
+          )}
         </div>
       )}
     </div>

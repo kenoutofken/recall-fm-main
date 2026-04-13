@@ -677,7 +677,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
             >
               <span className="flex items-center gap-1.5"><MapPin size={14} className="text-primary" /> Place</span>
             </FieldLabel>
-            <LocationSearch value={locationName} onChange={updateLocation} maxLength={120} />
+            <LocationSearch value={locationName} onChange={updateLocation} maxLength={120} menuPlacement="top" />
           </div>
 
           <div>

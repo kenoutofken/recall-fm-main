@@ -43,11 +43,11 @@ const MemoryListItem = ({ memory, onDelete, onEdit, onClick }: MemoryListItemPro
       </div>
 
       {/* Actions */}
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 shrink-0">
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(memory); }}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-full"
+            className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Edit memory"
           >
             <Pencil size={14} />
@@ -55,7 +55,7 @@ const MemoryListItem = ({ memory, onDelete, onEdit, onClick }: MemoryListItemPro
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(memory.id); }}
-          className="text-muted-foreground hover:text-destructive p-1 rounded-full"
+          className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
           aria-label="Delete memory"
         >
           <Trash2 size={14} />

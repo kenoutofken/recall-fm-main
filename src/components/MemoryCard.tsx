@@ -60,7 +60,7 @@ const MemoryCard = ({ memory, onDelete, onClick }: MemoryCardProps) => {
             <button
               type="button"
               onClick={(e) => e.stopPropagation()}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               aria-label="Delete memory"
             >
               <Trash2 size={19} />

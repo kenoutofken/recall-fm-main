@@ -4,7 +4,7 @@ import { useMemories } from "@/hooks/useMemories";
 import { useAuth } from "@/contexts/AuthContext";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { Memory, MOODS, MEMORY_TYPES } from "@/types/memory";
-import { Calendar, SlidersHorizontal, X, Search, Heart, Bookmark, ChevronLeft, ChevronRight, Sparkles, Maximize2, UserPlus, UserCheck, MapPin } from "lucide-react";
+import { Calendar, SlidersHorizontal, X, Search, Heart, Plus, Minus, ChevronLeft, ChevronRight, Sparkles, ArrowUpRight, UserPlus, UserCheck, MapPin } from "lucide-react";
 import AISuggestDrawer from "@/components/AISuggestDrawer";
 import FilterDrawer from "@/components/FilterDrawer";
 import { useLikes } from "@/hooks/useLikes";
@@ -412,7 +412,9 @@ const Discover = () => {
           m.title.toLowerCase().includes(q) ||
           m.songTitle.toLowerCase().includes(q) ||
           m.artist.toLowerCase().includes(q) ||
+          m.mood.toLowerCase().includes(q) ||
           (m.locationName?.toLowerCase().includes(q) ?? false) ||
+          m.tags.some((tag) => tag.toLowerCase().includes(q)) ||
           m.people.some((p) => p.toLowerCase().includes(q))
       );
     }
@@ -685,7 +687,7 @@ const Discover = () => {
                           toast.success(wasLiked ? "Removed like" : "Liked this memory!");
                         }}
                         className={cn(
-                          "text-muted-foreground hover:text-foreground transition-colors",
+                          "rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           userLikes.has(mem.id) && "text-foreground"
                         )}
                         aria-label={userLikes.has(mem.id) ? "Unlike memory" : "Like memory"}
@@ -709,12 +711,16 @@ const Discover = () => {
                           }
                         }}
                         className={cn(
-                          "text-muted-foreground hover:text-foreground transition-colors",
-                          isSongInPlaylist(mem.songTitle, mem.artist) && "text-foreground"
+                          "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors",
+                          isSongInPlaylist(mem.songTitle, mem.artist)
+                            ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         )}
                         aria-label={isSongInPlaylist(mem.songTitle, mem.artist) ? "Remove from playlist" : "Add to playlist"}
                       >
-                        <Bookmark size={16} className={isSongInPlaylist(mem.songTitle, mem.artist) ? "fill-foreground" : ""} />
+                        {isSongInPlaylist(mem.songTitle, mem.artist) ? <Minus size={13} /> : <Plus size={13} />}
+                        <span>Playlist</span>
                       </button>
                       <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} variant="compact" />
                     </div>
@@ -763,10 +769,10 @@ const Discover = () => {
                     <button
                       onClick={(e) => { e.stopPropagation(); setExpandedMemory(mem); }}
                       onPointerDown={(e) => e.stopPropagation()}
-                      className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                      className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                       aria-label="Open memory"
                     >
-                      <Maximize2 size={18} />
+                      <ArrowUpRight size={18} />
                     </button>
 
                     <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 space-y-4 p-4 text-white" onClick={(e) => e.stopPropagation()}>
@@ -775,7 +781,7 @@ const Discover = () => {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); showProfilePosts(mem); }}
-                            className="mb-2 w-fit text-xs font-medium text-white/75 transition-colors hover:text-white"
+                            className="mb-2 w-fit rounded-full px-2 py-1 text-xs font-medium text-white/75 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                           >
                             @{mem.username}
                           </button>
@@ -813,7 +819,7 @@ const Discover = () => {
                               toast.success(wasLiked ? "Removed like" : "Liked this memory!");
                             }}
                             className={cn(
-                              "flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-white backdrop-blur-sm transition-colors hover:bg-black/70",
+                              "flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                               userLikes.has(mem.id) && "text-white"
                             )}
                           >
@@ -839,11 +845,13 @@ const Discover = () => {
                               }
                             }}
                             className={cn(
-                              "flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70",
+                              "flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                               isSongInPlaylist(mem.songTitle, mem.artist) && "text-white"
                             )}
+                            aria-label={isSongInPlaylist(mem.songTitle, mem.artist) ? "Remove from playlist" : "Add to playlist"}
                           >
-                            <Bookmark size={18} className={isSongInPlaylist(mem.songTitle, mem.artist) ? "fill-white" : ""} />
+                            {isSongInPlaylist(mem.songTitle, mem.artist) ? <Minus size={16} /> : <Plus size={16} />}
+                            <span>Playlist</span>
                           </button>
                         </div>
 
@@ -852,7 +860,7 @@ const Discover = () => {
                           onClick={(e) => { e.stopPropagation(); goPrev(); }}
                           onPointerDown={(e) => e.stopPropagation()}
                           disabled={currentIndex === 0}
-                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:opacity-35 disabled:hover:bg-black/55"
+                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-35 disabled:hover:scale-100 disabled:hover:bg-black/55"
                         >
                           <ChevronLeft size={16} />
                           Prev
@@ -861,7 +869,7 @@ const Discover = () => {
                           onClick={(e) => { e.stopPropagation(); goNext(); }}
                           onPointerDown={(e) => e.stopPropagation()}
                           disabled={currentIndex >= filtered.length - 1}
-                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:opacity-35 disabled:hover:bg-black/55"
+                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-35 disabled:hover:scale-100 disabled:hover:bg-black/55"
                         >
                           Next
                           <ChevronRight size={16} />
@@ -901,7 +909,7 @@ const Discover = () => {
                   <button
                     type="button"
                     onClick={() => showProfilePosts(expandedMemory)}
-                    className="mb-1 w-fit text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    className="mb-1 w-fit rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     @{expandedMemory.username}
                   </button>
@@ -942,7 +950,7 @@ const Discover = () => {
                       toast.success(wasLiked ? "Removed like" : "Liked this memory!");
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors",
+                      "flex items-center gap-1.5 rounded-full px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       userLikes.has(expandedMemory.id) && "text-foreground"
                     )}
                   >
@@ -968,11 +976,16 @@ const Discover = () => {
                       }
                     }}
                     className={cn(
-                      "text-muted-foreground hover:text-foreground transition-colors",
-                      isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist) && "text-foreground"
+                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist)
+                        ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     )}
+                    aria-label={isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist) ? "Remove from playlist" : "Add to playlist"}
                   >
-                    <Bookmark size={20} className={isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist) ? "fill-foreground" : ""} />
+                    {isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist) ? <Minus size={14} /> : <Plus size={14} />}
+                    <span>Playlist</span>
                   </button>
                 </div>
               </div>
