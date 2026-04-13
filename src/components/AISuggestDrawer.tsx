@@ -64,7 +64,7 @@ const AISuggestDrawer = ({ open, onOpenChange, onResults }: AISuggestDrawerProps
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex flex-col rounded-t-2xl p-0">
+      <SheetContent side="bottom" className="mx-auto flex w-full max-w-lg flex-col rounded-t-2xl p-0">
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-border shrink-0">
           <SheetTitle className="flex items-center gap-2 font-display">
             <Sparkles size={18} className="text-primary" />

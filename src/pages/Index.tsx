@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
+import { matchesLocationFilter } from "@/lib/locationFilter";
+import type { LocationResult } from "@/components/LocationSearch";
 
 const Index = () => {
   const { memories, loading, addMemory, updateMemory, deleteMemory } = useMemories();
@@ -23,6 +25,10 @@ const Index = () => {
   const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [locationName, setLocationName] = useState("");
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
+  const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
@@ -43,9 +49,30 @@ const Index = () => {
     setSelectedMoods([]);
     setSelectedTags([]);
     setDateFilter(undefined);
+    setLocationName("");
+    setLocationLat(null);
+    setLocationLng(null);
+    setLocationPlaceId(null);
   };
 
-  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter;
+  const updateLocationFilter = (name: string, location?: LocationResult | null) => {
+    setLocationName(name);
+
+    if (location === null) {
+      setLocationLat(null);
+      setLocationLng(null);
+      setLocationPlaceId(null);
+      return;
+    }
+
+    if (location) {
+      setLocationLat(location.lat);
+      setLocationLng(location.lng);
+      setLocationPlaceId(location.placeId);
+    }
+  };
+
+  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName;
 
   const POSTS_PER_PAGE = 10;
   const [page, setPage] = useState(1);
@@ -81,12 +108,20 @@ const Index = () => {
         return d >= start && d <= end;
       });
     }
+    if (locationName) {
+      result = result.filter((m) => matchesLocationFilter(m, {
+        name: locationName,
+        lat: locationLat,
+        lng: locationLng,
+        placeId: locationPlaceId,
+      }));
+    }
     return result;
-  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter]);
+  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName]);
 
   const paginatedMemories = useMemo(() => {
     return filtered.slice(0, page * POSTS_PER_PAGE);
@@ -127,9 +162,9 @@ const Index = () => {
             className="relative shrink-0"
           >
             <SlidersHorizontal size={16} />
-            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0)) > 0 && (
+            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)) > 0 && (
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0)}
+                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)}
               </span>
             )}
           </Button>
@@ -225,9 +260,11 @@ const Index = () => {
         selectedTags={selectedTags}
         dateFilter={dateFilter}
         searchQuery={searchQuery}
+        locationName={locationName}
         onToggleMood={toggleMood}
         onToggleTag={toggleTag}
         onDateFilterChange={setDateFilter}
+        onLocationChange={updateLocationFilter}
         onClearFilters={clearFilters}
         onSearchChange={setSearchQuery}
       />

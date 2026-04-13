@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { SlidersHorizontal, X } from "lucide-react";
 import { MOODS, MEMORY_TYPES } from "@/types/memory";
 import TimePeriodPicker from "@/components/TimePeriodPicker";
+import LocationSearch, { type LocationResult } from "@/components/LocationSearch";
 import { cn } from "@/lib/utils";
 
 interface FilterDrawerProps {
@@ -13,9 +14,11 @@ interface FilterDrawerProps {
   selectedTags: string[];
   dateFilter: Date | undefined;
   searchQuery: string;
+  locationName: string;
   onToggleMood: (mood: string) => void;
   onToggleTag: (tag: string) => void;
   onDateFilterChange: (date: Date | undefined) => void;
+  onLocationChange: (value: string, location?: LocationResult | null) => void;
   onClearFilters: () => void;
   onSearchChange: (query: string) => void;
 }
@@ -27,23 +30,25 @@ const FilterDrawer = ({
   selectedTags,
   dateFilter,
   searchQuery,
+  locationName,
   onToggleMood,
   onToggleTag,
   onDateFilterChange,
+  onLocationChange,
   onClearFilters,
   onSearchChange,
 }: FilterDrawerProps) => {
   const hasActiveFilters =
-    searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter;
+    searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName;
 
   const activeFilterCount =
-    selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0);
+    selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[85vh] sm:h-[70vh] flex flex-col rounded-t-2xl p-0"
+        className="mx-auto flex h-[85vh] w-full max-w-lg flex-col rounded-t-2xl p-0 sm:h-[70vh]"
       >
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-border shrink-0">
           <SheetTitle className="flex items-center gap-2 font-display">
@@ -78,6 +83,23 @@ const FilterDrawer = ({
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Place */}
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-foreground">Place</p>
+              {locationName && (
+                <button
+                  type="button"
+                  onClick={() => onLocationChange("", null)}
+                  className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <LocationSearch value={locationName} onChange={onLocationChange} maxLength={120} />
           </div>
 
           {/* Mood Filter */}

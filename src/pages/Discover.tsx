@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatMemoryTime } from "@/lib/memoryTime";
+import { matchesLocationFilter } from "@/lib/locationFilter";
+import type { LocationResult } from "@/components/LocationSearch";
 
 const SWIPE_THRESHOLD = 60;
 type FeedMode = "community" | "following";
@@ -68,6 +70,10 @@ const Discover = () => {
   const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [locationName, setLocationName] = useState("");
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
+  const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -356,14 +362,35 @@ const Discover = () => {
     setSelectedMoods([]);
     setSelectedTags([]);
     setDateFilter(undefined);
+    setLocationName("");
+    setLocationLat(null);
+    setLocationLng(null);
+    setLocationPlaceId(null);
     setAiFilterIds(null);
     setAiReason("");
     setProfileFilter(null);
   };
 
+  const updateLocationFilter = (name: string, location?: LocationResult | null) => {
+    setLocationName(name);
+
+    if (location === null) {
+      setLocationLat(null);
+      setLocationLng(null);
+      setLocationPlaceId(null);
+      return;
+    }
+
+    if (location) {
+      setLocationLat(location.lat);
+      setLocationLng(location.lng);
+      setLocationPlaceId(location.placeId);
+    }
+  };
+
   const trimmedSearchQuery = searchQuery.trim();
   const hasSearchQuery = trimmedSearchQuery.length > 0;
-  const hasActiveFilters = hasSearchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || aiFilterIds !== null || profileFilter !== null;
+  const hasActiveFilters = hasSearchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName || aiFilterIds !== null || profileFilter !== null;
 
   const filtered = useMemo(() => {
     let result = memories;
@@ -408,13 +435,21 @@ const Discover = () => {
         return d >= start && d <= end;
       });
     }
+    if (locationName) {
+      result = result.filter((m) => matchesLocationFilter(m, {
+        name: locationName,
+        lat: locationLat,
+        lng: locationLng,
+        placeId: locationPlaceId,
+      }));
+    }
     return result;
-  }, [memories, profileFilter, feedMode, followingIds, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, aiFilterIds]);
+  }, [memories, profileFilter, feedMode, followingIds, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, aiFilterIds]);
 
   // Reset index when filters change
   useEffect(() => {
     setCurrentIndex(0);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter, profileFilter, feedMode]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, profileFilter, feedMode]);
 
   const memoryIds = useMemo(() => filtered.map((m) => m.id), [filtered]);
   const { likeCounts, userLikes, toggleLike } = useLikes(memoryIds);
@@ -505,9 +540,9 @@ const Discover = () => {
             className="relative shrink-0"
           >
             <SlidersHorizontal size={16} />
-            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0)) > 0 && (
+            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)) > 0 && (
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0)}
+                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)}
               </span>
             )}
           </Button>
@@ -946,7 +981,7 @@ const Discover = () => {
         </Dialog>
       )}
       <Sheet open={showUserSearch} onOpenChange={setShowUserSearch}>
-        <SheetContent side="bottom" className="flex h-[85vh] flex-col rounded-t-2xl p-0 sm:h-[70vh]">
+        <SheetContent side="bottom" className="mx-auto flex h-[85vh] w-full max-w-lg flex-col rounded-t-2xl p-0 sm:h-[70vh]">
           <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5 text-left">
             <SheetTitle className="font-display">Find Users</SheetTitle>
           </SheetHeader>
@@ -1032,9 +1067,11 @@ const Discover = () => {
         selectedTags={selectedTags}
         dateFilter={dateFilter}
         searchQuery={searchQuery}
+        locationName={locationName}
         onToggleMood={toggleMood}
         onToggleTag={toggleTag}
         onDateFilterChange={setDateFilter}
+        onLocationChange={updateLocationFilter}
         onClearFilters={clearFilters}
         onSearchChange={setSearchQuery}
       />

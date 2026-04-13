@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 type GeoapifyFeature = {
   properties?: {
@@ -12,6 +13,10 @@ type GeoapifyFeature = {
     lon?: number;
     place_id?: string;
   };
+};
+
+type GeoapifyAutocompleteResponse = {
+  features?: GeoapifyFeature[];
 };
 
 export type LocationResult = {
@@ -54,6 +59,16 @@ const toLocationResult = (feature: GeoapifyFeature): LocationResult | null => {
   };
 };
 
+const normalizeSuggestions = (features: GeoapifyFeature[] = []) => (
+  features
+    .map(toLocationResult)
+    .filter((item: LocationResult | null): item is LocationResult => Boolean(item))
+    .filter((item: LocationResult, index: number, items: LocationResult[]) => (
+      items.findIndex((candidate) => candidate.name === item.name) === index
+    ))
+    .slice(0, 5)
+);
+
 const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProps) => {
   const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
   const [suggestions, setSuggestions] = useState<LocationResult[]>([]);
@@ -62,7 +77,7 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!apiKey || value.trim().length < 3) {
+    if (value.trim().length < 3) {
       setSuggestions([]);
       setLoading(false);
       return;
@@ -73,26 +88,35 @@ const LocationSearch = ({ value, onChange, maxLength = 120 }: LocationSearchProp
       setLoading(true);
 
       try {
-        const params = new URLSearchParams({
-          apiKey,
-          text: value.trim(),
-          limit: "5",
-        });
+        let nextSuggestions: LocationResult[] = [];
 
-        const response = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params.toString()}`, {
-          signal: controller.signal,
-        });
+        try {
+          const { data, error } = await supabase.functions.invoke<GeoapifyAutocompleteResponse>("location-search", {
+            body: { query: value.trim(), limit: 5, apiKey },
+          });
 
-        if (!response.ok) throw new Error(`Geoapify failed (${response.status})`);
+          if (error) throw error;
+          nextSuggestions = normalizeSuggestions(data?.features);
+        } catch (functionError) {
+          console.warn("Location function failed, falling back to browser search:", functionError);
 
-        const data = await response.json();
-        const nextSuggestions = (data.features ?? [])
-          .map(toLocationResult)
-          .filter((item: LocationResult | null): item is LocationResult => Boolean(item))
-          .filter((item: LocationResult, index: number, items: LocationResult[]) => (
-            items.findIndex((candidate) => candidate.name === item.name) === index
-          ))
-          .slice(0, 5);
+          if (!apiKey) throw new Error("Geoapify API key is not configured");
+
+          const params = new URLSearchParams({
+            apiKey,
+            text: value.trim(),
+            limit: "5",
+          });
+
+          const response = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params.toString()}`, {
+            signal: controller.signal,
+          });
+
+          if (!response.ok) throw new Error(`Geoapify failed (${response.status})`);
+
+          const data = (await response.json()) as GeoapifyAutocompleteResponse;
+          nextSuggestions = normalizeSuggestions(data.features);
+        }
 
         setSuggestions(nextSuggestions);
         setOpen(nextSuggestions.length > 0);

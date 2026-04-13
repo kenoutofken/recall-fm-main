@@ -393,7 +393,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     <div
       className={cn(
         "fixed inset-0 z-50 flex bg-foreground/30 backdrop-blur-sm",
-        editingMemory ? "items-stretch justify-start p-0" : "items-end justify-center p-0 sm:p-4"
+        editingMemory ? "items-stretch justify-start p-0" : "items-end justify-center p-0 sm:px-4 sm:pt-4"
       )}
       onClick={onClose}
     >
@@ -404,7 +404,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           "overflow-y-auto bg-background p-6 shadow-xl animate-in duration-500",
           editingMemory
             ? "h-full max-h-full w-[90vw] max-w-lg rounded-r-2xl slide-in-from-left"
-            : "h-[92dvh] w-full rounded-t-2xl slide-in-from-bottom sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl"
+            : "h-[92dvh] w-full rounded-t-2xl slide-in-from-bottom sm:h-auto sm:max-h-[90vh] sm:max-w-lg"
         )}
       >
         <div className="flex items-center justify-between mb-6">
