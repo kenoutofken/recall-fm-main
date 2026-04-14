@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { MapPin, Minus, Plus, RotateCcw } from "lucide-react";
 import { Memory } from "@/types/memory";
-import MemoryDetailModal from "@/components/MemoryDetailModal";
 
 const TILE_SIZE = 256;
 const MIN_ZOOM = 0;
@@ -11,8 +11,6 @@ const MAX_LATITUDE = 85.05112878;
 
 type MemoryMapProps = {
   memories: Memory[];
-  onDelete: (id: string) => void;
-  onEdit?: (memory: Memory) => void;
 };
 
 type MapPoint = {
@@ -143,11 +141,12 @@ const wrapTileX = (x: number, zoom: number) => {
   return ((x % tileCount) + tileCount) % tileCount;
 };
 
-const MemoryMap = ({ memories, onDelete, onEdit }: MemoryMapProps) => {
+const MemoryMap = ({ memories }: MemoryMapProps) => {
   const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
+  const navigate = useNavigate();
+  const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; centerPixels: PixelPoint } | null>(null);
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [size, setSize] = useState({ width: 480, height: 360 });
   const [center, setCenter] = useState<LatLng>({ lat: 0, lng: 0 });
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
@@ -318,95 +317,92 @@ const MemoryMap = ({ memories, onDelete, onEdit }: MemoryMapProps) => {
   }
 
   return (
-    <>
-      <div
-        ref={containerRef}
-        className="relative h-[420px] touch-none overflow-hidden rounded-lg border border-border bg-muted cursor-grab active:cursor-grabbing"
-        aria-label="Memory map"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onWheel={onWheel}
-      >
-        {mapState && apiKey ? (
-          mapState.tiles.map((tile) => (
-            <img
-              key={tile.key}
-              src={`https://maps.geoapify.com/v1/tile/osm-bright/${zoom}/${tile.urlX}/${tile.urlY}.png?apiKey=${apiKey}`}
-              alt=""
-              className="absolute h-64 w-64 select-none"
-              draggable={false}
-              style={{ left: tile.left, top: tile.top }}
-            />
-          ))
-        ) : (
-          <div className="absolute inset-0 bg-muted" />
-        )}
+    <div
+      ref={containerRef}
+      className="relative h-[420px] touch-none overflow-hidden rounded-lg border border-border bg-muted cursor-grab active:cursor-grabbing"
+      aria-label="Memory map"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onWheel={onWheel}
+    >
+      {mapState && apiKey ? (
+        mapState.tiles.map((tile) => (
+          <img
+            key={tile.key}
+            src={`https://maps.geoapify.com/v1/tile/osm-bright/${zoom}/${tile.urlX}/${tile.urlY}.png?apiKey=${apiKey}`}
+            alt=""
+            className="absolute h-64 w-64 select-none"
+            draggable={false}
+            style={{ left: tile.left, top: tile.top }}
+          />
+        ))
+      ) : (
+        <div className="absolute inset-0 bg-muted" />
+      )}
 
-        {positionedPoints.map((point, index) => (
-          <button
-            key={point.memory.id}
-            type="button"
-            onClick={() => setSelectedMemory(point.memory)}
-            className="absolute -translate-x-1/2 -translate-y-full rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-md ring-2 ring-background transition-all hover:scale-105 hover:bg-primary/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            style={{ left: point.left, top: point.top, zIndex: positionedPoints.length - index }}
-          >
-            <span className="flex items-center gap-1">
-              <MapPin size={13} />
-              <span className="max-w-28 truncate">{point.memory.title}</span>
-            </span>
-          </button>
-        ))}
+      {positionedPoints.map((point, index) => (
+        <button
+          key={point.memory.id}
+          type="button"
+          onClick={() => navigate(`/journal/memories/${point.memory.id}`, {
+            state: {
+              from: {
+                pathname: location.pathname,
+                search: location.search,
+              },
+            },
+          })}
+          className="absolute -translate-x-1/2 -translate-y-full rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-md ring-2 ring-background transition-all hover:scale-105 hover:bg-primary/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          style={{ left: point.left, top: point.top, zIndex: positionedPoints.length - index }}
+        >
+          <span className="flex items-center gap-1">
+            <MapPin size={13} />
+            <span className="max-w-28 truncate">{point.memory.title}</span>
+          </span>
+        </button>
+      ))}
 
-        <div className="absolute right-3 top-3 z-[1000] flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
-          <button
-            type="button"
-            onClick={() => changeZoom(zoom + 1)}
-            className="flex h-9 w-9 items-center justify-center text-foreground hover:bg-muted disabled:opacity-40"
-            disabled={zoom >= MAX_ZOOM}
-            aria-label="Zoom in"
-          >
-            <Plus size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => changeZoom(zoom - 1)}
-            className="flex h-9 w-9 items-center justify-center border-t border-border text-foreground hover:bg-muted disabled:opacity-40"
-            disabled={zoom <= MIN_ZOOM}
-            aria-label="Zoom out"
-          >
-            <Minus size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={fitToPins}
-            className="flex h-9 w-9 items-center justify-center border-t border-border text-foreground hover:bg-muted"
-            aria-label="Fit pins"
-          >
-            <RotateCcw size={15} />
-          </button>
-        </div>
-
-        <div className="absolute bottom-3 left-3 z-[1000] rounded-lg border border-border bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
-          {points.length} {points.length === 1 ? "pin" : "pins"} · zoom {zoom}
-        </div>
-
-        {!apiKey && (
-          <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
-            Add VITE_GEOAPIFY_API_KEY to .env and restart the dev server to load map tiles.
-          </div>
-        )}
+      <div className="absolute right-3 top-3 z-[1000] flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+        <button
+          type="button"
+          onClick={() => changeZoom(zoom + 1)}
+          className="flex h-9 w-9 items-center justify-center text-foreground hover:bg-muted disabled:opacity-40"
+          disabled={zoom >= MAX_ZOOM}
+          aria-label="Zoom in"
+        >
+          <Plus size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => changeZoom(zoom - 1)}
+          className="flex h-9 w-9 items-center justify-center border-t border-border text-foreground hover:bg-muted disabled:opacity-40"
+          disabled={zoom <= MIN_ZOOM}
+          aria-label="Zoom out"
+        >
+          <Minus size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={fitToPins}
+          className="flex h-9 w-9 items-center justify-center border-t border-border text-foreground hover:bg-muted"
+          aria-label="Fit pins"
+        >
+          <RotateCcw size={15} />
+        </button>
       </div>
 
-      <MemoryDetailModal
-        memory={selectedMemory}
-        open={!!selectedMemory}
-        onOpenChange={(open) => { if (!open) setSelectedMemory(null); }}
-        onDelete={onDelete}
-        onEdit={onEdit}
-      />
-    </>
+      <div className="absolute bottom-3 left-3 z-[1000] rounded-lg border border-border bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
+        {points.length} {points.length === 1 ? "pin" : "pins"} · zoom {zoom}
+      </div>
+
+      {!apiKey && (
+        <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
+          Add VITE_GEOAPIFY_API_KEY to .env and restart the dev server to load map tiles.
+        </div>
+      )}
+    </div>
   );
 };
 

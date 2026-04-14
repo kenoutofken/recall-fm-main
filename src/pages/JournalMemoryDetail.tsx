@@ -1,49 +1,182 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Calendar, ChevronLeft, MapPin, Pencil, Trash2, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Calendar, ChevronLeft, Heart, MapPin, Minus, Pencil, Plus, Trash2, Users } from "lucide-react";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import MiniPlayer from "@/components/MiniPlayer";
 import UserAvatar from "@/components/UserAvatar";
+import AudioToggleButton from "@/components/AudioToggleButton";
 import { useMemories } from "@/hooks/useMemories";
+import { useLikes } from "@/hooks/useLikes";
+import { usePlaylist } from "@/hooks/usePlaylist";
 import { formatMemoryTime } from "@/lib/memoryTime";
 import { Memory } from "@/types/memory";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+
+type DetailLocationState = {
+  from?: {
+    pathname?: string;
+    search?: string;
+  };
+};
 
 const JournalMemoryDetail = () => {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { memories, loading, updateMemory, deleteMemory } = useMemories();
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [publicMemory, setPublicMemory] = useState<Memory | null>(null);
+  const [publicLoading, setPublicLoading] = useState(false);
+  const [publicChecked, setPublicChecked] = useState(false);
 
-  const memory = useMemo(() => memories.find((item) => item.id === id) ?? null, [id, memories]);
+  const isDiscoverDetail = location.pathname.startsWith("/discover/");
+  const memory = useMemo(() => {
+    if (isDiscoverDetail) return publicMemory;
+    return memories.find((item) => item.id === id) ?? null;
+  }, [id, isDiscoverDetail, memories, publicMemory]);
   const moodParts = memory?.mood.split(",").map((mood) => mood.trim()).filter(Boolean) ?? [];
+  const backLabel = isDiscoverDetail ? "Discover" : "Journal";
+  const backPath = isDiscoverDetail ? "/" : "/journal";
+  const locationState = location.state as DetailLocationState | null;
+  const returnPath = locationState?.from?.pathname
+    ? `${locationState.from.pathname}${locationState.from.search ?? ""}`
+    : backPath;
+  const { likeCounts, userLikes, toggleLike } = useLikes(memory ? [memory.id] : []);
+  const { songs, addSong, removeSong, isSongInPlaylist } = usePlaylist();
+  const canEditMemory = Boolean(memory && !isDiscoverDetail);
+
+  useEffect(() => {
+    if (!isDiscoverDetail || !id) {
+      setPublicMemory(null);
+      setPublicLoading(false);
+      setPublicChecked(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchPublicMemory = async () => {
+      setPublicLoading(true);
+      setPublicChecked(false);
+      const { data, error } = await supabase
+        .from("memories")
+        .select("*")
+        .eq("id", id)
+        .eq("is_public", true)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        if (error) console.error(error);
+        setPublicMemory(null);
+        setPublicLoading(false);
+        setPublicChecked(true);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, display_name, avatar_url")
+        .eq("user_id", data.user_id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      setPublicMemory({
+        id: data.id,
+        title: data.title,
+        description: data.description ?? "",
+        songTitle: data.song_title,
+        artist: data.artist,
+        date: data.date,
+        memoryYear: data.memory_year ?? null,
+        memorySeason: data.memory_season ?? null,
+        locationName: data.location_name ?? null,
+        locationLat: data.location_lat ?? null,
+        locationLng: data.location_lng ?? null,
+        locationPlaceId: data.location_place_id ?? null,
+        mood: data.mood,
+        people: data.people ?? [],
+        isPublic: true,
+        imageUrl: data.image_url ?? null,
+        tags: data.tags ?? [],
+        createdAt: data.created_at,
+        userId: data.user_id,
+        username: profile?.username ?? null,
+        displayName: profile?.display_name ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
+      });
+      setPublicLoading(false);
+      setPublicChecked(true);
+    };
+
+    fetchPublicMemory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isDiscoverDetail]);
+
+  const pageLoading = isDiscoverDetail ? publicLoading || !publicChecked : loading;
 
   const handleDelete = async () => {
     if (!memory) return;
     await deleteMemory(memory.id);
-    navigate("/journal", { replace: true });
+    navigate(returnPath, { replace: true });
+  };
+
+  const togglePlaylist = () => {
+    if (!memory) return;
+    const inList = isSongInPlaylist(memory.songTitle, memory.artist);
+
+    if (inList) {
+      const song = songs.find(
+        (s) => s.songTitle.toLowerCase() === memory.songTitle.toLowerCase() && s.artist.toLowerCase() === memory.artist.toLowerCase()
+      );
+      if (song) {
+        removeSong(song.id);
+        toast.success("Removed from your playlist");
+      }
+      return;
+    }
+
+    addSong(memory.songTitle, memory.artist, memory.id);
+    toast.success("Added to your playlist!");
   };
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
-          <UserAvatar />
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="font-display text-xl font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            Recall.fm
+          </button>
+          <div className="flex items-center gap-2">
+            <AudioToggleButton />
+            <UserAvatar />
+          </div>
         </div>
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 pb-24">
         <button
           type="button"
-          onClick={() => navigate("/journal")}
+          onClick={() => navigate(returnPath)}
           className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft size={18} />
-          Journal
+          {backLabel}
         </button>
 
-        {loading ? (
+        {pageLoading ? (
           <p className="text-center text-sm text-muted-foreground py-20">Loading memory...</p>
         ) : !memory ? (
           <div className="text-center py-20">
@@ -51,10 +184,10 @@ const JournalMemoryDetail = () => {
             <p className="text-sm text-muted-foreground mb-6">This memory may have been deleted.</p>
             <button
               type="button"
-              onClick={() => navigate("/journal")}
+              onClick={() => navigate(returnPath)}
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Back to Journal
+              Back to {backLabel}
             </button>
           </div>
         ) : (
@@ -64,6 +197,15 @@ const JournalMemoryDetail = () => {
             )}
 
             <div className="space-y-3">
+              {isDiscoverDetail && memory.username && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/?profile=${memory.userId}&username=${memory.username}`)}
+                  className="w-fit rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  @{memory.username}
+                </button>
+              )}
               <h1 className="font-display text-3xl font-semibold leading-tight text-foreground">
                 {memory.title}
               </h1>
@@ -120,6 +262,38 @@ const JournalMemoryDetail = () => {
               )}
             </div>
 
+            {isDiscoverDetail ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const wasLiked = userLikes.has(memory.id);
+                    toggleLike(memory.id);
+                    toast.success(wasLiked ? "Removed like" : "Liked this memory!");
+                  }}
+                  className={cn(
+                    "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    userLikes.has(memory.id) && "border-primary text-primary"
+                  )}
+                >
+                  <Heart size={16} className={userLikes.has(memory.id) ? "fill-primary" : ""} />
+                  Like{(likeCounts[memory.id] || 0) > 0 ? ` ${likeCounts[memory.id]}` : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePlaylist}
+                  className={cn(
+                    "inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isSongInPlaylist(memory.songTitle, memory.artist)
+                      ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "border-border bg-card text-foreground hover:bg-muted"
+                  )}
+                >
+                  {isSongInPlaylist(memory.songTitle, memory.artist) ? <Minus size={16} /> : <Plus size={16} />}
+                  Playlist
+                </button>
+              </div>
+            ) : canEditMemory && (
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -168,6 +342,7 @@ const JournalMemoryDetail = () => {
                 </SheetContent>
               </Sheet>
             </div>
+            )}
           </article>
         )}
       </main>

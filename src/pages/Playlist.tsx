@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { usePlaylist } from "@/hooks/usePlaylist";
 import { Trash2, Copy, ExternalLink, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
+import AudioToggleButton from "@/components/AudioToggleButton";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { useMemories } from "@/hooks/useMemories";
 import { toast } from "sonner";
@@ -12,6 +14,7 @@ import MiniPlayer from "@/components/MiniPlayer";
 const TUNEMYMUSIC_URL = "https://www.tunemymusic.com/transfer";
 
 const Playlist = () => {
+  const navigate = useNavigate();
   const { songs, loading, removeSong } = usePlaylist();
   const { addMemory } = useMemories();
   const [showForm, setShowForm] = useState(false);
@@ -26,11 +29,20 @@ const Playlist = () => {
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="font-display text-xl font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            >
+              Recall.fm
+            </button>
             <span className="text-muted-foreground/30">|</span>
             <h1 className="font-display text-xl font-normal text-foreground">My Playlist</h1>
           </div>
-          <UserAvatar />
+          <div className="flex items-center gap-2">
+            <AudioToggleButton />
+            <UserAvatar />
+          </div>
         </div>
       </header>
 
@@ -140,7 +152,10 @@ const Playlist = () => {
 
       {showForm && (
         <AddMemoryForm
-          onAdd={addMemory}
+          onAdd={(data) => {
+            addMemory(data);
+            navigate("/journal");
+          }}
           onClose={() => setShowForm(false)}
           editingMemory={null}
         />

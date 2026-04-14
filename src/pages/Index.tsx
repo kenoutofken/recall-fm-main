@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 
 import { ArrowUpDown, Search, SlidersHorizontal, X, LayoutGrid, List, Map } from "lucide-react";
 import { useMemories } from "@/hooks/useMemories";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Memory } from "@/types/memory";
 import Timeline, { MemorySortMode, ViewMode, sortMemories } from "@/components/Timeline";
@@ -9,6 +10,7 @@ import AddMemoryForm from "@/components/AddMemoryForm";
 import MemoryMap from "@/components/MemoryMap";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
+import AudioToggleButton from "@/components/AudioToggleButton";
 import FilterDrawer from "@/components/FilterDrawer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,7 +36,22 @@ const SORT_LABELS: Record<MemorySortMode, string> = {
   artist: "Artist name",
 };
 
+const VIEW_MODES: ViewMode[] = ["cards", "list", "map"];
+const SORT_MODES: MemorySortMode[] = ["newest", "oldest", "title", "song", "artist"];
+const LIST_ONLY_SORT_MODES: MemorySortMode[] = ["title", "song", "artist"];
+
+const parseViewMode = (value: string | null): ViewMode => {
+  return VIEW_MODES.includes(value as ViewMode) ? (value as ViewMode) : "cards";
+};
+
+const parseSortMode = (value: string | null, viewMode: ViewMode): MemorySortMode => {
+  const sortMode = SORT_MODES.includes(value as MemorySortMode) ? (value as MemorySortMode) : "newest";
+  return viewMode !== "list" && LIST_ONLY_SORT_MODES.includes(sortMode) ? "newest" : sortMode;
+};
+
 const Index = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { memories, loading, addMemory, updateMemory, deleteMemory } = useMemories();
   const [showForm, setShowForm] = useState(false);
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
@@ -47,14 +64,44 @@ const Index = () => {
   const [locationLng, setLocationLng] = useState<number | null>(null);
   const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
-  const [sortMode, setSortMode] = useState<MemorySortMode>("newest");
+  const [viewMode, setViewMode] = useState<ViewMode>(() => parseViewMode(searchParams.get("view")));
+  const [sortMode, setSortMode] = useState<MemorySortMode>(() => parseSortMode(searchParams.get("sort"), parseViewMode(searchParams.get("view"))));
 
   useEffect(() => {
-    if (viewMode !== "list" && ["title", "song", "artist"].includes(sortMode)) {
+    const nextViewMode = parseViewMode(searchParams.get("view"));
+    const nextSortMode = parseSortMode(searchParams.get("sort"), nextViewMode);
+    setViewMode(nextViewMode);
+    setSortMode(nextSortMode);
+  }, [searchParams]);
+
+  const updateJournalUrlState = useCallback((nextViewMode: ViewMode, nextSortMode: MemorySortMode) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("view", nextViewMode);
+      next.set("sort", nextSortMode);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const selectViewMode = (nextViewMode: ViewMode) => {
+    const nextSortMode = nextViewMode !== "list" && LIST_ONLY_SORT_MODES.includes(sortMode) ? "newest" : sortMode;
+    setViewMode(nextViewMode);
+    setSortMode(nextSortMode);
+    updateJournalUrlState(nextViewMode, nextSortMode);
+  };
+
+  const selectSortMode = (nextSortMode: MemorySortMode) => {
+    const safeSortMode = parseSortMode(nextSortMode, viewMode);
+    setSortMode(safeSortMode);
+    updateJournalUrlState(viewMode, safeSortMode);
+  };
+
+  useEffect(() => {
+    if (viewMode !== "list" && LIST_ONLY_SORT_MODES.includes(sortMode)) {
       setSortMode("newest");
+      updateJournalUrlState(viewMode, "newest");
     }
-  }, [sortMode, viewMode]);
+  }, [sortMode, updateJournalUrlState, viewMode]);
 
   const toggleMood = (mood: string) => {
     setSelectedMoods((prev) =>
@@ -164,8 +211,17 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
-          <UserAvatar />
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="font-display text-xl font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            Recall.fm
+          </button>
+          <div className="flex items-center gap-2">
+            <AudioToggleButton />
+            <UserAvatar />
+          </div>
         </div>
       </header>
 
@@ -175,7 +231,7 @@ const Index = () => {
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search your memories…"
+              placeholder="Quick search memories…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-10"
@@ -201,7 +257,7 @@ const Index = () => {
               <DropdownMenuLabel>Sort by</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={sortMode}
-                onValueChange={(value) => setSortMode(value as MemorySortMode)}
+                onValueChange={(value) => selectSortMode(value as MemorySortMode)}
               >
                 <DropdownMenuRadioItem value="newest">Newest on top</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="oldest">Oldest on top</DropdownMenuRadioItem>
@@ -259,7 +315,7 @@ const Index = () => {
               </p>
               <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-1">
                 <button
-                  onClick={() => setViewMode("cards")}
+                  onClick={() => selectViewMode("cards")}
                   className={cn(
                     "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
@@ -270,7 +326,7 @@ const Index = () => {
                   <span>Timeline</span>
                 </button>
                 <button
-                  onClick={() => setViewMode("list")}
+                  onClick={() => selectViewMode("list")}
                   className={cn(
                     "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
@@ -281,7 +337,7 @@ const Index = () => {
                   <span>List</span>
                 </button>
                 <button
-                  onClick={() => setViewMode("map")}
+                  onClick={() => selectViewMode("map")}
                   className={cn(
                     "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
@@ -294,9 +350,9 @@ const Index = () => {
               </div>
             </div>
             {viewMode === "map" ? (
-              <MemoryMap memories={sortedFiltered} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} />
+              <MemoryMap memories={sortedFiltered} />
             ) : (
-              <Timeline memories={paginatedMemories} onDelete={deleteMemory} onEdit={(m) => { setEditingMemory(m); setShowForm(true); }} viewMode={viewMode} sortMode={sortMode} />
+              <Timeline memories={paginatedMemories} viewMode={viewMode} sortMode={sortMode} />
             )}
             {viewMode !== "map" && hasMorePages && (
               <Button
@@ -338,6 +394,7 @@ const Index = () => {
               updateMemory(editingMemory.id, memoryData);
             } else {
               addMemory(memoryData);
+              navigate("/journal");
             }
           }}
           onClose={() => { setShowForm(false); setEditingMemory(null); }}

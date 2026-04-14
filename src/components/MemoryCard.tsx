@@ -1,14 +1,11 @@
 import { Memory, MOODS } from "@/types/memory";
-import { Calendar, Trash2, Users, MapPin } from "lucide-react";
+import { Calendar, Users, MapPin } from "lucide-react";
 import MiniPlayer from "@/components/MiniPlayer";
 import { formatMemoryTime } from "@/lib/memoryTime";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface MemoryCardProps {
   memory: Memory;
-  onDelete: (id: string) => void;
-  onEdit?: (memory: Memory) => void;
   onClick?: (memory: Memory) => void;
   index: number;
 }
@@ -28,7 +25,7 @@ const getMoodGradient = (mood: string) => {
   return MOOD_GRADIENTS[label] ?? "bg-gradient-to-br from-muted to-muted-foreground/20";
 };
 
-const MemoryCard = ({ memory, onDelete, onClick }: MemoryCardProps) => {
+const MemoryCard = ({ memory, onClick }: MemoryCardProps) => {
   const moodParts = memory.mood.split(",").map((mood) => mood.trim()).filter(Boolean);
 
   return (
@@ -52,48 +49,6 @@ const MemoryCard = ({ memory, onDelete, onClick }: MemoryCardProps) => {
         {memory.imageUrl && <img src={memory.imageUrl} alt="" className="size-full object-cover" />}
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/88 via-black/48 to-transparent" />
-      </div>
-
-      <div className="absolute right-3 top-3 z-10 flex gap-2">
-        <Sheet>
-          <SheetTrigger asChild>
-            <button
-              type="button"
-              onClick={(e) => e.stopPropagation()}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-              aria-label="Delete memory"
-            >
-              <Trash2 size={19} />
-            </button>
-          </SheetTrigger>
-          <SheetContent side="right" onClick={(e) => e.stopPropagation()} className="flex w-[86vw] max-w-sm flex-col p-0">
-            <SheetHeader className="border-b border-border px-5 py-5 text-left">
-              <SheetTitle>Delete this memory?</SheetTitle>
-            </SheetHeader>
-            <div className="flex flex-1 flex-col justify-between gap-6 px-5 py-5">
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                This will permanently remove "{memory.title}" from your journal.
-              </p>
-              <div className="grid gap-2">
-                <SheetClose asChild>
-                  <button
-                    type="button"
-                    className="h-11 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                  >
-                    Cancel
-                  </button>
-                </SheetClose>
-                <button
-                  type="button"
-                  onClick={() => onDelete(memory.id)}
-                  className="h-11 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
-                >
-                  Delete Memory
-                </button>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-10 space-y-3 p-4">

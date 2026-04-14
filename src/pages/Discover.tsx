@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemories } from "@/hooks/useMemories";
 import { useAuth } from "@/contexts/AuthContext";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { Memory, MOODS, MEMORY_TYPES } from "@/types/memory";
-import { Calendar, SlidersHorizontal, X, Search, Heart, Plus, Minus, ChevronLeft, ChevronRight, Sparkles, ArrowUpRight, UserPlus, UserCheck, MapPin } from "lucide-react";
+import { Calendar, SlidersHorizontal, X, Search, Heart, Plus, Minus, ChevronLeft, ChevronRight, Sparkles, UserPlus, UserCheck, MapPin } from "lucide-react";
 import AISuggestDrawer from "@/components/AISuggestDrawer";
 import FilterDrawer from "@/components/FilterDrawer";
 import { useLikes } from "@/hooks/useLikes";
@@ -12,15 +12,15 @@ import { usePlaylist } from "@/hooks/usePlaylist";
 import MiniPlayer from "@/components/MiniPlayer";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
+import AudioToggleButton from "@/components/AudioToggleButton";
 import { parseISO, startOfMonth, endOfMonth } from "date-fns";
-import { motion, AnimatePresence, type PanInfo } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
+import { motion, type PanInfo } from "framer-motion";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatMemoryTime } from "@/lib/memoryTime";
 import { matchesLocationFilter } from "@/lib/locationFilter";
@@ -63,6 +63,7 @@ const getMoodParts = (mood: string) => (
 const Discover = () => {
   const { addMemory } = useMemories();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +79,6 @@ const Discover = () => {
   const [showForm, setShowForm] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
-  const [expandedMemory, setExpandedMemory] = useState<Memory | null>(null);
   const [showAISuggest, setShowAISuggest] = useState(false);
   const [aiFilterIds, setAiFilterIds] = useState<string[] | null>(null);
   const [aiReason, setAiReason] = useState("");
@@ -90,13 +90,17 @@ const Discover = () => {
   const [userResults, setUserResults] = useState<ProfileResult[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [followSavingId, setFollowSavingId] = useState<string | null>(null);
+  const isDraggingCardRef = useRef(false);
 
   const showProfilePosts = (memory: Memory) => {
     if (!memory.userId || !memory.username) return;
     setProfileFilter({ userId: memory.userId, username: memory.username });
-    setExpandedMemory(null);
     setCurrentIndex(0);
     setSearchParams({ profile: memory.userId, username: memory.username });
+  };
+
+  const openMemoryDetail = (memory: Memory) => {
+    navigate(`/discover/memories/${memory.id}`);
   };
 
   const clearProfileFilter = () => {
@@ -474,10 +478,12 @@ const Discover = () => {
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x < -SWIPE_THRESHOLD) goNext();
     else if (info.offset.x > SWIPE_THRESHOLD) goPrev();
+    window.setTimeout(() => {
+      isDraggingCardRef.current = false;
+    }, 0);
   };
 
   const currentMemory = filtered[currentIndex];
-  const expandedMoodParts = expandedMemory ? getMoodParts(expandedMemory.mood) : [];
   const emptyTitle = hasActiveFilters
     ? "No matches"
     : feedMode === "following"
@@ -495,8 +501,17 @@ const Discover = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <span className="font-display text-xl font-bold text-foreground">Recall.fm</span>
-          <UserAvatar />
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="font-display text-xl font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            Recall.fm
+          </button>
+          <div className="flex items-center gap-2">
+            <AudioToggleButton />
+            <UserAvatar />
+          </div>
         </div>
       </header>
 
@@ -506,7 +521,7 @@ const Discover = () => {
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search memories…"
+              placeholder="Quick search memories…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-10"
@@ -645,7 +660,7 @@ const Discover = () => {
                 <div
                   key={mem.id}
                   className="rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer"
-                  onClick={() => setExpandedMemory(mem)}
+                  onClick={() => openMemoryDetail(mem)}
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-lg shrink-0">{firstEmoji}</span>
@@ -752,6 +767,13 @@ const Discover = () => {
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.4}
+                    onClick={() => {
+                      if (isDraggingCardRef.current) return;
+                      openMemoryDetail(mem);
+                    }}
+                    onDragStart={() => {
+                      isDraggingCardRef.current = true;
+                    }}
                     onDragEnd={handleDragEnd}
                   >
                     <div className={cn("absolute inset-0", !mem.imageUrl && getMoodGradient(mem.mood))}>
@@ -766,16 +788,7 @@ const Discover = () => {
                         <span className="block min-w-0 truncate">{mem.locationName}</span>
                       </div>
                     )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setExpandedMemory(mem); }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                      aria-label="Open memory"
-                    >
-                      <ArrowUpRight size={18} />
-                    </button>
-
-                    <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 space-y-4 p-4 text-white" onClick={(e) => e.stopPropagation()}>
+                    <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 space-y-4 p-4 text-white">
                       <div className="min-w-0">
                         {mem.username && (
                           <button
@@ -813,7 +826,8 @@ const Discover = () => {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex shrink-0 items-center gap-3">
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               const wasLiked = userLikes.has(mem.id);
                               toggleLike(mem.id);
                               toast.success(wasLiked ? "Removed like" : "Liked this memory!");
@@ -829,7 +843,8 @@ const Discover = () => {
                             )}
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               const inList = isSongInPlaylist(mem.songTitle, mem.artist);
                               if (inList) {
                                 const song = songs.find(
@@ -891,108 +906,15 @@ const Discover = () => {
 
       {showForm && (
         <AddMemoryForm
-          onAdd={addMemory}
+          onAdd={(data) => {
+            addMemory(data);
+            navigate("/journal");
+          }}
           onClose={() => setShowForm(false)}
           editingMemory={null}
         />
       )}
 
-      {expandedMemory && (
-        <Dialog open onOpenChange={(open) => !open && setExpandedMemory(null)}>
-          <DialogContent className="h-full max-h-full w-full min-w-0 overflow-hidden rounded-none p-0 gap-0 sm:h-auto sm:max-h-[85vh] sm:w-[calc(100vw-2rem)] sm:max-w-md sm:rounded-lg [&>button]:z-50 [&>button]:flex [&>button]:h-9 [&>button]:w-9 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full [&>button]:bg-black/55 [&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-sm [&>button]:ring-offset-0 [&>button]:transition-colors [&>button:hover]:bg-black/70">
-            <div className="min-w-0 flex-1 overflow-y-auto p-6 pt-12 space-y-4">
-              {expandedMemory.imageUrl && (
-                <img src={expandedMemory.imageUrl} alt="" className="w-full h-48 object-cover rounded-md" />
-              )}
-              <DialogHeader className="min-w-0">
-                {expandedMemory.username && (
-                  <button
-                    type="button"
-                    onClick={() => showProfilePosts(expandedMemory)}
-                    className="mb-1 w-fit rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    @{expandedMemory.username}
-                  </button>
-                )}
-                <DialogTitle className="min-w-0 break-words font-display text-xl leading-snug">{expandedMemory.title}</DialogTitle>
-                {expandedMoodParts.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {expandedMoodParts.map((mood) => (
-                      <Badge key={mood} variant="secondary" className="px-2.5 py-1 text-xs font-medium">
-                        {mood}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </DialogHeader>
-              <p className="min-w-0 break-words text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {expandedMemory.description}
-              </p>
-              <div className="min-w-0 max-w-full overflow-hidden">
-                <MiniPlayer songTitle={expandedMemory.songTitle} artist={expandedMemory.artist} />
-              </div>
-              {expandedMemory.locationName && (
-                <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <MapPin size={12} className="shrink-0" />
-                  <span className="min-w-0 break-words">{expandedMemory.locationName}</span>
-                </div>
-              )}
-              <div className="flex min-w-0 items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <Calendar size={12} />
-                  <span>{formatMemoryTime(expandedMemory)}</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <button
-                    onClick={() => {
-                      const wasLiked = userLikes.has(expandedMemory.id);
-                      toggleLike(expandedMemory.id);
-                      toast.success(wasLiked ? "Removed like" : "Liked this memory!");
-                    }}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      userLikes.has(expandedMemory.id) && "text-foreground"
-                    )}
-                  >
-                    <Heart size={20} className={userLikes.has(expandedMemory.id) ? "fill-foreground" : ""} />
-                    {(likeCounts[expandedMemory.id] || 0) > 0 && (
-                      <span className="text-xs">{likeCounts[expandedMemory.id]}</span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const inList = isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist);
-                      if (inList) {
-                        const song = songs.find(
-                          (s) => s.songTitle.toLowerCase() === expandedMemory.songTitle.toLowerCase() && s.artist.toLowerCase() === expandedMemory.artist.toLowerCase()
-                        );
-                        if (song) {
-                          removeSong(song.id);
-                          toast.success("Removed from your playlist");
-                        }
-                      } else {
-                        addSong(expandedMemory.songTitle, expandedMemory.artist, expandedMemory.id);
-                        toast.success("Added to your playlist!");
-                      }
-                    }}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                      isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist)
-                        ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    )}
-                    aria-label={isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist) ? "Remove from playlist" : "Add to playlist"}
-                  >
-                    {isSongInPlaylist(expandedMemory.songTitle, expandedMemory.artist) ? <Minus size={14} /> : <Plus size={14} />}
-                    <span>Playlist</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
       <Sheet open={showUserSearch} onOpenChange={setShowUserSearch}>
         <SheetContent side="bottom" className="mx-auto flex h-[85vh] w-full max-w-lg flex-col rounded-t-2xl p-0 sm:h-[70vh]">
           <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5 text-left">

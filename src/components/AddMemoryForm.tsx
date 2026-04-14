@@ -360,12 +360,24 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     setFormStep((current) => (current === 0 ? 0 : ((current - 1) as FormStep)));
   };
 
+  const goBackFromForm = () => {
+    if (formStep === 0) {
+      setStage("ai");
+      return;
+    }
+
+    goToPreviousStep();
+  };
+
   const goToNextStep = () => {
     setFormStep((current) => (current === 2 ? 2 : ((current + 1) as FormStep)));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveMemory = async () => {
+    if (stage !== "form") return;
+    if (!editingMemory && formStep !== FORM_STEPS.length - 1) {
+      return;
+    }
     if (!title || !songTitle || !artist || selectedMoods.length === 0) return;
     const imageUrl = await uploadImage();
     onAdd({
@@ -389,6 +401,10 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     onClose();
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+  };
+
   return (
     <div
       className={cn(
@@ -399,6 +415,11 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     >
       <form
         onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.target instanceof HTMLElement && e.target.tagName !== "TEXTAREA") {
+            e.preventDefault();
+          }
+        }}
         onClick={(e) => e.stopPropagation()}
         className={cn(
           "overflow-y-auto bg-background p-6 shadow-xl animate-in duration-500",
@@ -877,10 +898,10 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
 
         {stage === "form" && (
           <div className="mt-6 flex gap-2">
-            {!editingMemory && formStep > 0 && (
+            {!editingMemory && (
               <button
                 type="button"
-                onClick={goToPreviousStep}
+                onClick={goBackFromForm}
                 className="flex-1 rounded-lg border border-border bg-card py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
               >
                 Back
@@ -896,7 +917,8 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
               </button>
             ) : (
               <button
-                type="submit"
+                type="button"
+                onClick={saveMemory}
                 disabled={!title || !songTitle || !artist || selectedMoods.length === 0 || uploading}
                 className="flex-1 rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >

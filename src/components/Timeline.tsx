@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Memory } from "@/types/memory";
 import MemoryCard from "@/components/MemoryCard";
 import MemoryListItem from "@/components/MemoryListItem";
@@ -36,15 +36,25 @@ export const sortMemories = (memories: Memory[], sortMode: MemorySortMode) => {
 
 interface TimelineProps {
   memories: Memory[];
-  onDelete: (id: string) => void;
-  onEdit?: (memory: Memory) => void;
   viewMode?: ViewMode;
   sortMode?: MemorySortMode;
 }
 
-const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards", sortMode = "newest" }: TimelineProps) => {
+const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: TimelineProps) => {
   const [expandedMonths, setExpandedMonths] = useState<Record<string, number>>({});
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const openMemoryDetail = (memory: Memory) => {
+    navigate(`/journal/memories/${memory.id}`, {
+      state: {
+        from: {
+          pathname: location.pathname,
+          search: location.search,
+        },
+      },
+    });
+  };
 
   const sorted = useMemo(() => {
     return sortMemories(memories, sortMode);
@@ -93,9 +103,7 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards", sortMode = "
               >
                 <MemoryListItem
                   memory={memory}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  onClick={(selected) => navigate(`/journal/memories/${selected.id}`)}
+                  onClick={openMemoryDetail}
                 />
               </motion.div>
             ))}
@@ -150,12 +158,10 @@ const Timeline = ({ memories, onDelete, onEdit, viewMode = "cards", sortMode = "
                         {viewMode === "list" ? (
                           <MemoryListItem
                             memory={memory}
-                            onDelete={onDelete}
-                            onEdit={onEdit}
-                            onClick={(selected) => navigate(`/journal/memories/${selected.id}`)}
+                            onClick={openMemoryDetail}
                           />
                         ) : (
-                          <MemoryCard memory={memory} onDelete={onDelete} onEdit={onEdit} onClick={(selected) => navigate(`/journal/memories/${selected.id}`)} index={0} />
+                          <MemoryCard memory={memory} onClick={openMemoryDetail} index={0} />
                         )}
                       </div>
                     </motion.div>
