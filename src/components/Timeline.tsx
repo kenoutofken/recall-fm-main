@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Flower, Leaf, Snowflake, Sun } from "lucide-react";
 import { Memory } from "@/types/memory";
 import MemoryCard from "@/components/MemoryCard";
 import MemoryListItem from "@/components/MemoryListItem";
@@ -32,6 +33,14 @@ export const sortMemories = (memories: Memory[], sortMode: MemorySortMode) => {
 
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+};
+
+const getSeasonIcon = (memory: Memory) => {
+  const season = memory.memorySeason ?? seasonFromDate(memory.date);
+  if (season === "Spring") return Flower;
+  if (season === "Summer") return Sun;
+  if (season === "Fall") return Leaf;
+  return Snowflake;
 };
 
 interface TimelineProps {
@@ -127,12 +136,13 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
             const visibleCount = getVisibleCount(monthKey, items.length);
             const visibleItems = items.slice(0, visibleCount);
             const hasMore = visibleCount < items.length;
+            const SeasonIcon = getSeasonIcon(items[0]);
 
             return (
               <div key={monthKey} className="mb-8">
                 <div className="relative flex items-center gap-3 mb-4">
-                  <div className="relative z-10 h-[30px] w-[30px] rounded-full bg-primary flex items-center justify-center">
-                    <span className="text-xs font-bold text-primary-foreground">{formatMemoryTime(items[0])[0]}</span>
+                  <div className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <SeasonIcon size={17} strokeWidth={2.4} aria-hidden="true" />
                   </div>
                   <h2 className="font-display text-base font-semibold text-foreground">
                     {formatMemoryTime(items[0])}

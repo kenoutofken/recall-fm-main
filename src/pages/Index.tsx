@@ -14,10 +14,11 @@ import AudioToggleButton from "@/components/AudioToggleButton";
 import FilterDrawer from "@/components/FilterDrawer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { endOfDay, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { matchesLocationFilter } from "@/lib/locationFilter";
 import type { LocationResult } from "@/components/LocationSearch";
+import { Slider } from "@/components/ui/slider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ const SORT_LABELS: Record<MemorySortMode, string> = {
 const VIEW_MODES: ViewMode[] = ["cards", "list", "map"];
 const SORT_MODES: MemorySortMode[] = ["newest", "oldest", "title", "song", "artist"];
 const LIST_ONLY_SORT_MODES: MemorySortMode[] = ["title", "song", "artist"];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const parseViewMode = (value: string | null): ViewMode => {
   return VIEW_MODES.includes(value as ViewMode) ? (value as ViewMode) : "cards";
@@ -66,6 +68,7 @@ const Index = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => parseViewMode(searchParams.get("view")));
   const [sortMode, setSortMode] = useState<MemorySortMode>(() => parseSortMode(searchParams.get("sort"), parseViewMode(searchParams.get("view"))));
+  const [timelineDateRange, setTimelineDateRange] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     const nextViewMode = parseViewMode(searchParams.get("view"));
@@ -120,6 +123,7 @@ const Index = () => {
     setSelectedMoods([]);
     setSelectedTags([]);
     setDateFilter(undefined);
+    setTimelineDateRange(null);
     setLocationName("");
     setLocationLat(null);
     setLocationLng(null);
@@ -143,10 +147,53 @@ const Index = () => {
     }
   };
 
-  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName;
-
-  const POSTS_PER_PAGE = 10;
+  const TIMELINE_POSTS_PER_PAGE = 10;
+  const LIST_POSTS_PER_PAGE = 20;
   const [page, setPage] = useState(1);
+
+  const timelineDateBounds = useMemo(() => {
+    const timestamps = memories
+      .map((memory) => startOfDay(parseISO(memory.date)).getTime())
+      .filter((timestamp) => Number.isFinite(timestamp));
+
+    if (timestamps.length === 0) return null;
+
+    return {
+      min: Math.min(...timestamps),
+      max: Math.max(...timestamps),
+    };
+  }, [memories]);
+
+  useEffect(() => {
+    if (!timelineDateBounds) {
+      setTimelineDateRange(null);
+      return;
+    }
+
+    setTimelineDateRange((current) => {
+      if (!current) return null;
+
+      const nextStart = Math.max(timelineDateBounds.min, Math.min(current[0], timelineDateBounds.max));
+      const nextEnd = Math.max(timelineDateBounds.min, Math.min(current[1], timelineDateBounds.max));
+
+      if (nextStart === timelineDateBounds.min && nextEnd === timelineDateBounds.max) return null;
+      return [Math.min(nextStart, nextEnd), Math.max(nextStart, nextEnd)];
+    });
+  }, [timelineDateBounds]);
+
+  const timelineSliderValue: [number, number] | null = timelineDateBounds
+    ? timelineDateRange ?? ([timelineDateBounds.min, timelineDateBounds.max] as [number, number])
+    : null;
+
+  const timelineDateRangeActive = Boolean(
+    viewMode === "cards" &&
+    timelineDateBounds &&
+    timelineDateRange &&
+    (timelineDateRange[0] > timelineDateBounds.min || timelineDateRange[1] < timelineDateBounds.max)
+  );
+
+  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName || timelineDateRangeActive;
+  const activeFilterCount = selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0) + (timelineDateRangeActive ? 1 : 0);
 
   const filtered = useMemo(() => {
     let result = memories;
@@ -190,20 +237,30 @@ const Index = () => {
         placeId: locationPlaceId,
       }));
     }
+    if (viewMode === "cards" && timelineDateBounds && timelineDateRangeActive && timelineDateRange) {
+      const rangeStart = startOfDay(new Date(timelineDateRange[0]));
+      const rangeEnd = endOfDay(new Date(timelineDateRange[1]));
+      result = result.filter((m) => {
+        const date = parseISO(m.date);
+        return date >= rangeStart && date <= rangeEnd;
+      });
+    }
     return result;
-  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId]);
+  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, timelineDateBounds, timelineDateRange, timelineDateRangeActive, viewMode]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, sortMode]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, sortMode, timelineDateRange, viewMode]);
 
   const sortedFiltered = useMemo(() => {
     return sortMemories(filtered, sortMode);
   }, [filtered, sortMode]);
 
+  const memoriesPerPage = viewMode === "list" ? LIST_POSTS_PER_PAGE : TIMELINE_POSTS_PER_PAGE;
+
   const paginatedMemories = useMemo(() => {
-    return sortedFiltered.slice(0, page * POSTS_PER_PAGE);
-  }, [sortedFiltered, page]);
+    return sortedFiltered.slice(0, page * memoriesPerPage);
+  }, [memoriesPerPage, sortedFiltered, page]);
 
   const hasMorePages = paginatedMemories.length < sortedFiltered.length;
 
@@ -279,9 +336,9 @@ const Index = () => {
             className="relative shrink-0"
           >
             <SlidersHorizontal size={16} />
-            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)) > 0 && (
+            {activeFilterCount > 0 && (
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)}
+                {activeFilterCount}
               </span>
             )}
           </Button>
@@ -349,6 +406,44 @@ const Index = () => {
                 </button>
               </div>
             </div>
+            {viewMode === "cards" && timelineDateBounds && timelineSliderValue && timelineDateBounds.min < timelineDateBounds.max && (
+              <div className="mb-4 rounded-lg border border-border bg-card px-4 py-3">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Timeline range</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(timelineSliderValue[0]), "MMM d, yyyy")} - {format(new Date(timelineSliderValue[1]), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                  {timelineDateRangeActive && (
+                    <button
+                      type="button"
+                      onClick={() => setTimelineDateRange(null)}
+                      className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <Slider
+                  min={timelineDateBounds.min}
+                  max={timelineDateBounds.max}
+                  step={DAY_MS}
+                  minStepsBetweenThumbs={1}
+                  value={timelineSliderValue}
+                  onValueChange={(value) => {
+                    if (value.length < 2 || !timelineDateBounds) return;
+                    const nextRange: [number, number] = [Math.min(value[0], value[1]), Math.max(value[0], value[1])];
+                    if (nextRange[0] <= timelineDateBounds.min && nextRange[1] >= timelineDateBounds.max) {
+                      setTimelineDateRange(null);
+                      return;
+                    }
+                    setTimelineDateRange(nextRange);
+                  }}
+                  aria-label="Timeline date range"
+                />
+              </div>
+            )}
             {viewMode === "map" ? (
               <MemoryMap memories={sortedFiltered} />
             ) : (
@@ -361,7 +456,7 @@ const Index = () => {
                 onClick={() => setPage((p) => p + 1)}
                 className="w-full mt-4 text-xs text-muted-foreground"
               >
-                Show more ({filtered.length - paginatedMemories.length} remaining)
+                Show more ({sortedFiltered.length - paginatedMemories.length} remaining)
               </Button>
             )}
           </>

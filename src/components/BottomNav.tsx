@@ -12,12 +12,12 @@ const BottomNav = ({ onNewMemory }: BottomNavProps) => {
   const isDiscoverActive = location.pathname === "/" || location.pathname.startsWith("/discover");
   const isJournalActive = location.pathname.startsWith("/journal");
   const navItemClass =
-    "my-2 flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-  const activeNavItemClass = "bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary hover:text-primary-foreground";
+    "group relative flex flex-col items-center gap-1 px-3 pb-2 pt-3 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const activeNavItemClass = "text-primary font-semibold hover:text-primary";
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-t border-border">
-      <div className="max-w-lg mx-auto grid grid-cols-3 items-center gap-2 px-4 pb-2 pt-0">
+      <div className="max-w-lg mx-auto grid grid-cols-3 items-center px-4 pb-2 pt-0">
         <NavLink
           to="/"
           end
@@ -25,7 +25,14 @@ const BottomNav = ({ onNewMemory }: BottomNavProps) => {
         >
           {() => (
             <>
-              <div className="transition-colors">
+              <span className={cn(
+                "absolute left-1/2 top-0 h-1 w-12 -translate-x-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                isDiscoverActive && "opacity-100"
+              )} />
+              <div className={cn(
+                "flex h-8 w-12 items-center justify-center transition-colors",
+                !isDiscoverActive && "group-hover:text-foreground"
+              )}>
                 <Compass
                   size={23}
                   strokeWidth={isDiscoverActive ? 2.5 : 2}
@@ -51,7 +58,14 @@ const BottomNav = ({ onNewMemory }: BottomNavProps) => {
         >
           {() => (
             <>
-              <div className="transition-colors">
+              <span className={cn(
+                "absolute left-1/2 top-0 h-1 w-12 -translate-x-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                isJournalActive && "opacity-100"
+              )} />
+              <div className={cn(
+                "flex h-8 w-12 items-center justify-center transition-colors",
+                !isJournalActive && "group-hover:text-foreground"
+              )}>
                 <BookOpen
                   size={23}
                   strokeWidth={isJournalActive ? 2.5 : 2}
