@@ -4,19 +4,21 @@ import { ArrowUpDown, Search, SlidersHorizontal, X, LayoutGrid, List, Map } from
 import { useMemories } from "@/hooks/useMemories";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { Memory } from "@/types/memory";
+import { Memory, MEMORY_SEASONS } from "@/types/memory";
 import Timeline, { MemorySortMode, ViewMode, sortMemories } from "@/components/Timeline";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import MemoryMap from "@/components/MemoryMap";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
+import NotificationButton from "@/components/NotificationButton";
 import FilterDrawer from "@/components/FilterDrawer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { endOfDay, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
+import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { matchesLocationFilter } from "@/lib/locationFilter";
+import { seasonFromDate, yearFromDate } from "@/lib/memoryTime";
 import type { LocationResult } from "@/components/LocationSearch";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -40,7 +42,7 @@ const SORT_LABELS: Record<MemorySortMode, string> = {
 const VIEW_MODES: ViewMode[] = ["cards", "list", "map"];
 const SORT_MODES: MemorySortMode[] = ["newest", "oldest", "title", "song", "artist"];
 const LIST_ONLY_SORT_MODES: MemorySortMode[] = ["title", "song", "artist"];
-const DAY_MS = 24 * 60 * 60 * 1000;
+const SEASON_COUNT = MEMORY_SEASONS.length;
 
 const parseViewMode = (value: string | null): ViewMode => {
   return VIEW_MODES.includes(value as ViewMode) ? (value as ViewMode) : "cards";
@@ -49,6 +51,19 @@ const parseViewMode = (value: string | null): ViewMode => {
 const parseSortMode = (value: string | null, viewMode: ViewMode): MemorySortMode => {
   const sortMode = SORT_MODES.includes(value as MemorySortMode) ? (value as MemorySortMode) : "newest";
   return viewMode !== "list" && LIST_ONLY_SORT_MODES.includes(sortMode) ? "newest" : sortMode;
+};
+
+const getMemorySeasonBucket = (memory: Memory) => {
+  const year = memory.memoryYear ?? yearFromDate(memory.date);
+  const season = memory.memorySeason ?? seasonFromDate(memory.date);
+  const seasonIndex = MEMORY_SEASONS.indexOf(season as (typeof MEMORY_SEASONS)[number]);
+  return year * SEASON_COUNT + Math.max(0, seasonIndex);
+};
+
+const formatSeasonBucket = (bucket: number) => {
+  const year = Math.floor(bucket / SEASON_COUNT);
+  const season = MEMORY_SEASONS[bucket % SEASON_COUNT];
+  return `${season} ${year}`;
 };
 
 const Index = () => {
@@ -68,7 +83,7 @@ const Index = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => parseViewMode(searchParams.get("view")));
   const [sortMode, setSortMode] = useState<MemorySortMode>(() => parseSortMode(searchParams.get("sort"), parseViewMode(searchParams.get("view"))));
-  const [timelineDateRange, setTimelineDateRange] = useState<[number, number] | null>(null);
+  const [timelineSeasonRange, setTimelineSeasonRange] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     const nextViewMode = parseViewMode(searchParams.get("view"));
@@ -123,7 +138,7 @@ const Index = () => {
     setSelectedMoods([]);
     setSelectedTags([]);
     setDateFilter(undefined);
-    setTimelineDateRange(null);
+    setTimelineSeasonRange(null);
     setLocationName("");
     setLocationLat(null);
     setLocationLng(null);
@@ -151,49 +166,49 @@ const Index = () => {
   const LIST_POSTS_PER_PAGE = 20;
   const [page, setPage] = useState(1);
 
-  const timelineDateBounds = useMemo(() => {
-    const timestamps = memories
-      .map((memory) => startOfDay(parseISO(memory.date)).getTime())
-      .filter((timestamp) => Number.isFinite(timestamp));
+  const timelineSeasonBounds = useMemo(() => {
+    const buckets = memories
+      .map(getMemorySeasonBucket)
+      .filter((bucket) => Number.isFinite(bucket));
 
-    if (timestamps.length === 0) return null;
+    if (buckets.length === 0) return null;
 
     return {
-      min: Math.min(...timestamps),
-      max: Math.max(...timestamps),
+      min: Math.min(...buckets),
+      max: Math.max(...buckets),
     };
   }, [memories]);
 
   useEffect(() => {
-    if (!timelineDateBounds) {
-      setTimelineDateRange(null);
+    if (!timelineSeasonBounds) {
+      setTimelineSeasonRange(null);
       return;
     }
 
-    setTimelineDateRange((current) => {
+    setTimelineSeasonRange((current) => {
       if (!current) return null;
 
-      const nextStart = Math.max(timelineDateBounds.min, Math.min(current[0], timelineDateBounds.max));
-      const nextEnd = Math.max(timelineDateBounds.min, Math.min(current[1], timelineDateBounds.max));
+      const nextStart = Math.max(timelineSeasonBounds.min, Math.min(current[0], timelineSeasonBounds.max));
+      const nextEnd = Math.max(timelineSeasonBounds.min, Math.min(current[1], timelineSeasonBounds.max));
 
-      if (nextStart === timelineDateBounds.min && nextEnd === timelineDateBounds.max) return null;
+      if (nextStart === timelineSeasonBounds.min && nextEnd === timelineSeasonBounds.max) return null;
       return [Math.min(nextStart, nextEnd), Math.max(nextStart, nextEnd)];
     });
-  }, [timelineDateBounds]);
+  }, [timelineSeasonBounds]);
 
-  const timelineSliderValue: [number, number] | null = timelineDateBounds
-    ? timelineDateRange ?? ([timelineDateBounds.min, timelineDateBounds.max] as [number, number])
+  const timelineSliderValue: [number, number] | null = timelineSeasonBounds
+    ? timelineSeasonRange ?? ([timelineSeasonBounds.min, timelineSeasonBounds.max] as [number, number])
     : null;
 
-  const timelineDateRangeActive = Boolean(
+  const timelineSeasonRangeActive = Boolean(
     viewMode === "cards" &&
-    timelineDateBounds &&
-    timelineDateRange &&
-    (timelineDateRange[0] > timelineDateBounds.min || timelineDateRange[1] < timelineDateBounds.max)
+    timelineSeasonBounds &&
+    timelineSeasonRange &&
+    (timelineSeasonRange[0] > timelineSeasonBounds.min || timelineSeasonRange[1] < timelineSeasonBounds.max)
   );
 
-  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName || timelineDateRangeActive;
-  const activeFilterCount = selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0) + (timelineDateRangeActive ? 1 : 0);
+  const hasActiveFilters = searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName || timelineSeasonRangeActive;
+  const activeFilterCount = selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0) + (timelineSeasonRangeActive ? 1 : 0);
 
   const filtered = useMemo(() => {
     let result = memories;
@@ -237,20 +252,18 @@ const Index = () => {
         placeId: locationPlaceId,
       }));
     }
-    if (viewMode === "cards" && timelineDateBounds && timelineDateRangeActive && timelineDateRange) {
-      const rangeStart = startOfDay(new Date(timelineDateRange[0]));
-      const rangeEnd = endOfDay(new Date(timelineDateRange[1]));
+    if (viewMode === "cards" && timelineSeasonBounds && timelineSeasonRangeActive && timelineSeasonRange) {
       result = result.filter((m) => {
-        const date = parseISO(m.date);
-        return date >= rangeStart && date <= rangeEnd;
+        const bucket = getMemorySeasonBucket(m);
+        return bucket >= timelineSeasonRange[0] && bucket <= timelineSeasonRange[1];
       });
     }
     return result;
-  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, timelineDateBounds, timelineDateRange, timelineDateRangeActive, viewMode]);
+  }, [memories, searchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, timelineSeasonBounds, timelineSeasonRange, timelineSeasonRangeActive, viewMode]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, sortMode, timelineDateRange, viewMode]);
+  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, sortMode, timelineSeasonRange, viewMode]);
 
   const sortedFiltered = useMemo(() => {
     return sortMemories(filtered, sortMode);
@@ -276,6 +289,7 @@ const Index = () => {
             Recall.fm
           </button>
           <div className="flex items-center gap-2">
+            <NotificationButton />
             <AudioToggleButton />
             <UserAvatar />
           </div>
@@ -406,19 +420,19 @@ const Index = () => {
                 </button>
               </div>
             </div>
-            {viewMode === "cards" && timelineDateBounds && timelineSliderValue && timelineDateBounds.min < timelineDateBounds.max && (
+            {viewMode === "cards" && timelineSeasonBounds && timelineSliderValue && timelineSeasonBounds.min < timelineSeasonBounds.max && (
               <div className="mb-4 rounded-lg border border-border bg-card px-4 py-3">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-foreground">Timeline range</p>
                     <p className="text-xs text-muted-foreground">
-                      {format(new Date(timelineSliderValue[0]), "MMM d, yyyy")} - {format(new Date(timelineSliderValue[1]), "MMM d, yyyy")}
+                      {formatSeasonBucket(timelineSliderValue[0])} - {formatSeasonBucket(timelineSliderValue[1])}
                     </p>
                   </div>
-                  {timelineDateRangeActive && (
+                  {timelineSeasonRangeActive && (
                     <button
                       type="button"
-                      onClick={() => setTimelineDateRange(null)}
+                      onClick={() => setTimelineSeasonRange(null)}
                       className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                     >
                       Reset
@@ -426,21 +440,21 @@ const Index = () => {
                   )}
                 </div>
                 <Slider
-                  min={timelineDateBounds.min}
-                  max={timelineDateBounds.max}
-                  step={DAY_MS}
+                  min={timelineSeasonBounds.min}
+                  max={timelineSeasonBounds.max}
+                  step={1}
                   minStepsBetweenThumbs={1}
                   value={timelineSliderValue}
                   onValueChange={(value) => {
-                    if (value.length < 2 || !timelineDateBounds) return;
+                    if (value.length < 2 || !timelineSeasonBounds) return;
                     const nextRange: [number, number] = [Math.min(value[0], value[1]), Math.max(value[0], value[1])];
-                    if (nextRange[0] <= timelineDateBounds.min && nextRange[1] >= timelineDateBounds.max) {
-                      setTimelineDateRange(null);
+                    if (nextRange[0] <= timelineSeasonBounds.min && nextRange[1] >= timelineSeasonBounds.max) {
+                      setTimelineSeasonRange(null);
                       return;
                     }
-                    setTimelineDateRange(nextRange);
+                    setTimelineSeasonRange(nextRange);
                   }}
-                  aria-label="Timeline date range"
+                  aria-label="Timeline season range"
                 />
               </div>
             )}

@@ -1,14 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Flower, Leaf, Snowflake, Sun } from "lucide-react";
 import { Memory } from "@/types/memory";
 import MemoryCard from "@/components/MemoryCard";
 import MemoryListItem from "@/components/MemoryListItem";
-import { Button } from "@/components/ui/button";
 import { formatMemoryTime, seasonFromDate, yearFromDate } from "@/lib/memoryTime";
-
-const ITEMS_PER_PAGE = 10;
 
 export type ViewMode = "cards" | "list" | "map";
 export type MemorySortMode = "newest" | "oldest" | "title" | "song" | "artist";
@@ -50,7 +47,6 @@ interface TimelineProps {
 }
 
 const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: TimelineProps) => {
-  const [expandedMonths, setExpandedMonths] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -80,18 +76,6 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
     });
     return Array.from(map.entries());
   }, [sorted]);
-
-  const getVisibleCount = (monthKey: string, total: number) => {
-    const extra = expandedMonths[monthKey] ?? 0;
-    return Math.min(ITEMS_PER_PAGE + extra, total);
-  };
-
-  const showMore = (monthKey: string) => {
-    setExpandedMonths((prev) => ({
-      ...prev,
-      [monthKey]: (prev[monthKey] ?? 0) + ITEMS_PER_PAGE,
-    }));
-  };
 
   if (viewMode === "list") {
     return (
@@ -133,9 +117,6 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
           <div className="absolute left-[15px] top-0 bottom-0 w-px bg-primary/70" />
 
           {grouped.map(([monthKey, items]) => {
-            const visibleCount = getVisibleCount(monthKey, items.length);
-            const visibleItems = items.slice(0, visibleCount);
-            const hasMore = visibleCount < items.length;
             const SeasonIcon = getSeasonIcon(items[0]);
 
             return (
@@ -146,7 +127,7 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
                   </div>
                   <h2 className="font-display text-base font-semibold text-foreground">
                     {formatMemoryTime(items[0])}
-                    {items.length > ITEMS_PER_PAGE && (
+                    {items.length > 1 && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         ({items.length})
                       </span>
@@ -155,7 +136,7 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
                 </div>
 
                 <div className={`pl-[38px] ${viewMode === "list" ? "space-y-1.5" : "space-y-4"}`}>
-                  {visibleItems.map((memory, i) => (
+                  {items.map((memory, i) => (
                     <motion.div
                       key={memory.id}
                       initial={{ opacity: 0, x: -12 }}
@@ -176,16 +157,6 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
                       </div>
                     </motion.div>
                   ))}
-                  {hasMore && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => showMore(monthKey)}
-                      className="w-full text-xs text-muted-foreground"
-                    >
-                      Show more ({items.length - visibleCount} remaining)
-                    </Button>
-                  )}
                 </div>
               </div>
             );

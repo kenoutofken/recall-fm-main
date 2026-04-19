@@ -5,6 +5,7 @@ import AddMemoryForm from "@/components/AddMemoryForm";
 import MiniPlayer from "@/components/MiniPlayer";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
+import NotificationButton from "@/components/NotificationButton";
 import { useMemories } from "@/hooks/useMemories";
 import { useLikes } from "@/hooks/useLikes";
 import { usePlaylist } from "@/hooks/usePlaylist";
@@ -160,6 +161,7 @@ const JournalMemoryDetail = () => {
             Recall.fm
           </button>
           <div className="flex items-center gap-2">
+            <NotificationButton />
             <AudioToggleButton />
             <UserAvatar />
           </div>

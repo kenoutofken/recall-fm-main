@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
+import NotificationButton from "@/components/NotificationButton";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { useMemories } from "@/hooks/useMemories";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ const Playlist = () => {
             <h1 className="font-display text-xl font-normal text-foreground">My Playlist</h1>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationButton />
             <AudioToggleButton />
             <UserAvatar />
           </div>

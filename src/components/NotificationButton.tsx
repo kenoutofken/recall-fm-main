@@ -1,0 +1,303 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Bell, Heart, Loader2, UserPlus } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+
+type ProfileSummary = {
+  username: string | null;
+  displayName: string | null;
+};
+
+type OwnedMemorySummary = {
+  id: string;
+  title: string;
+  songTitle: string;
+};
+
+type NotificationItem = {
+  id: string;
+  type: "memory_like" | "follow";
+  actorId: string | null;
+  actorName: string;
+  createdAt: string;
+  readAt: string | null;
+  memory?: OwnedMemorySummary;
+};
+
+const formatActorName = (profile: ProfileSummary | undefined) => {
+  if (!profile) return "Someone";
+  if (profile.displayName) return profile.displayName;
+  if (profile.username) return `@${profile.username}`;
+  return "Someone";
+};
+
+const NotificationButton = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("id, type, actor_id, memory_id, created_at, read_at")
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      setLoading(false);
+      return;
+    }
+
+    const rawNotifications = (data ?? [])
+      .filter((notification) => notification.type === "memory_like" || notification.type === "follow")
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 40);
+
+    const actorIds = Array.from(new Set(rawNotifications.map((notification) => notification.actor_id).filter(Boolean)));
+    const memoryIds = Array.from(new Set(rawNotifications.map((notification) => notification.memory_id).filter(Boolean)));
+
+    const [profilesResult, memoriesResult] = await Promise.all([
+      actorIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("user_id, username, display_name")
+            .in("user_id", actorIds)
+        : Promise.resolve({ data: [], error: null }),
+      memoryIds.length > 0
+        ? supabase
+            .from("memories")
+            .select("id, title, song_title")
+            .in("id", memoryIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (profilesResult.error || memoriesResult.error) {
+      console.error(profilesResult.error ?? memoriesResult.error);
+      setLoading(false);
+      return;
+    }
+
+    const profilesById = new Map<string, ProfileSummary>(
+      (profilesResult.data ?? []).map((profile) => [
+        profile.user_id,
+        {
+          username: profile.username,
+          displayName: profile.display_name,
+        },
+      ]),
+    );
+
+    const memoriesById = new Map<string, OwnedMemorySummary>(
+      (memoriesResult.data ?? []).map((memory) => [
+        memory.id,
+        {
+          id: memory.id,
+          title: memory.title,
+          songTitle: memory.song_title,
+        },
+      ]),
+    );
+
+    setNotifications(rawNotifications.map((notification) => ({
+      id: notification.id,
+      type: notification.type as "memory_like" | "follow",
+      actorId: notification.actor_id,
+      actorName: notification.actor_id ? formatActorName(profilesById.get(notification.actor_id)) : "Someone",
+      createdAt: notification.created_at,
+      readAt: notification.read_at,
+      memory: notification.memory_id ? memoriesById.get(notification.memory_id) : undefined,
+    })));
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    const markNotificationsRead = async () => {
+      if (!open || !user) return;
+      const unreadIds = notifications
+        .filter((notification) => !notification.readAt)
+        .map((notification) => notification.id);
+      if (unreadIds.length === 0) return;
+
+      const readAt = new Date().toISOString();
+      setNotifications((current) =>
+        current.map((notification) =>
+          unreadIds.includes(notification.id) ? { ...notification, readAt } : notification
+        )
+      );
+
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read_at: readAt })
+        .in("id", unreadIds)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error(error);
+        fetchNotifications();
+      }
+    };
+
+    markNotificationsRead();
+  }, [fetchNotifications, notifications, open, user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => fetchNotifications(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchNotifications, user]);
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter((notification) => !notification.readAt).length;
+  }, [notifications]);
+
+  const openMemory = (memoryId: string) => {
+    setOpen(false);
+    navigate(`/journal/memories/${memoryId}`);
+  };
+
+  const clearNotifications = async () => {
+    if (!user || notifications.length === 0 || clearing) return;
+
+    const previousNotifications = notifications;
+    setClearing(true);
+    setNotifications([]);
+
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      setNotifications(previousNotifications);
+    }
+
+    setClearing(false);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            unreadCount > 0
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+          )}
+          aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
+          title="Notifications"
+        >
+          <Bell size={16} />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </SheetTrigger>
+      <SheetContent side="right" className="flex h-full w-[92vw] flex-col overflow-hidden p-0 sm:max-w-sm">
+        <SheetHeader className="border-b border-border px-5 pb-3 pt-5 text-left">
+          <div className="flex items-center justify-between gap-3 pr-8">
+            <SheetTitle className="font-display">Notifications</SheetTitle>
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={clearNotifications}
+                disabled={clearing}
+                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                {clearing ? "Clearing" : "Clear all"}
+              </button>
+            )}
+          </div>
+        </SheetHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card py-6 text-sm text-muted-foreground">
+              <Loader2 size={16} className="animate-spin" />
+              Loading notifications
+            </div>
+          ) : notifications.length === 0 ? (
+            <p className="rounded-lg border border-border bg-card px-3 py-4 text-center text-sm text-muted-foreground">
+              Likes and new followers will appear here.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {notifications.map((notification) => {
+                const isUnread = !notification.readAt;
+                const Icon = notification.type === "memory_like" ? Heart : UserPlus;
+                return (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={() => notification.memory && openMemory(notification.memory.id)}
+                    disabled={!notification.memory}
+                    className={cn(
+                      "flex w-full items-start gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors",
+                      notification.memory ? "hover:bg-muted" : "cursor-default",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                        notification.type === "memory_like" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+                      )}
+                    >
+                      <Icon size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm leading-snug text-foreground">
+                        <span className="font-medium">{notification.actorName}</span>{" "}
+                        {notification.type === "memory_like" ? "liked your memory" : "followed you"}
+                      </span>
+                      {notification.memory && (
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {notification.memory.title}
+                        </span>
+                      )}
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                      </span>
+                    </span>
+                    {isUnread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+export default NotificationButton;

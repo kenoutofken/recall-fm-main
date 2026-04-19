@@ -13,6 +13,7 @@ import MiniPlayer from "@/components/MiniPlayer";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
+import NotificationButton from "@/components/NotificationButton";
 import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { motion, type PanInfo } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -509,6 +510,7 @@ const Discover = () => {
             Recall.fm
           </button>
           <div className="flex items-center gap-2">
+            <NotificationButton />
             <AudioToggleButton />
             <UserAvatar />
           </div>
