@@ -30,7 +30,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [muted, setMuted] = useState(false);
-  const { siteMuted } = useAudioSettings();
+  const { siteMuted, siteVolume } = useAudioSettings();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animRef = useRef<number>(0);
   const autoStartedRef = useRef(false);
@@ -144,6 +144,12 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
     return () => cancelAnimationFrame(animRef.current);
   }, [playing, updateProgress]);
 
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = siteVolume;
+    }
+  }, [siteVolume, track?.preview]);
+
   const handleEnded = () => {
     autoStartedRef.current = false;
     if (autoPlay) userPausedAutoRef.current = true;
@@ -217,7 +223,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
         <audio
           ref={audioRef}
           src={track.preview}
-          muted={siteMuted || muted}
+          muted={siteMuted || muted || siteVolume === 0}
           onEnded={handleEnded}
           preload="none"
         />
@@ -249,9 +255,9 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
                 ? "text-white/70 hover:bg-white/15 hover:text-white focus-visible:ring-white/70"
                 : "text-muted-foreground hover:bg-background hover:text-foreground hover:shadow-sm focus-visible:ring-ring"
             )}
-            aria-label={siteMuted ? "Site audio is muted" : muted ? "Unmute" : "Mute"}
+            aria-label={siteMuted || siteVolume === 0 ? "Site audio is muted" : muted ? "Unmute" : "Mute"}
           >
-            {siteMuted || muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            {siteMuted || muted || siteVolume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
           <button
             type="button"
@@ -281,7 +287,7 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
       <audio
         ref={audioRef}
         src={track.preview}
-        muted={siteMuted || muted}
+        muted={siteMuted || muted || siteVolume === 0}
         onEnded={handleEnded}
         preload="none"
       />
