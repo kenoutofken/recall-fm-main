@@ -84,6 +84,7 @@ const Index = () => {
   const [viewMode, setViewMode] = useState<ViewMode>(() => parseViewMode(searchParams.get("view")));
   const [sortMode, setSortMode] = useState<MemorySortMode>(() => parseSortMode(searchParams.get("sort"), parseViewMode(searchParams.get("view"))));
   const [timelineSeasonRange, setTimelineSeasonRange] = useState<[number, number] | null>(null);
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
 
   useEffect(() => {
     const nextViewMode = parseViewMode(searchParams.get("view"));
@@ -91,6 +92,15 @@ const Index = () => {
     setViewMode(nextViewMode);
     setSortMode(nextSortMode);
   }, [searchParams]);
+
+  useEffect(() => {
+    const updateHeaderShadow = () => setIsHeaderScrolled(window.scrollY > 4);
+
+    updateHeaderShadow();
+    window.addEventListener("scroll", updateHeaderShadow, { passive: true });
+
+    return () => window.removeEventListener("scroll", updateHeaderShadow);
+  }, []);
 
   const updateJournalUrlState = useCallback((nextViewMode: ViewMode, nextSortMode: MemorySortMode) => {
     setSearchParams((prev) => {
@@ -278,9 +288,14 @@ const Index = () => {
   const hasMorePages = paginatedMemories.length < sortedFiltered.length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-background pt-16">
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-40 border-b border-border bg-background transition-shadow",
+          isHeaderScrolled && "shadow-sm"
+        )}
+      >
+        <div className="mx-auto flex h-16 max-w-lg items-center justify-between px-4">
           <button
             type="button"
             onClick={() => navigate("/")}

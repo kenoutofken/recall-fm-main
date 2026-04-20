@@ -408,7 +408,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex bg-foreground/30 backdrop-blur-sm",
+        "fixed inset-0 z-50 flex bg-black/80 backdrop-blur-sm",
         editingMemory ? "items-stretch justify-start p-0" : "items-end justify-center p-0 sm:px-4 sm:pt-4"
       )}
       onClick={onClose}
