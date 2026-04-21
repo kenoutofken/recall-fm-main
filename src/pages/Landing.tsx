@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { cn } from "@/lib/utils";
+import { PressableButton } from "@/components/ui/pressable-button";
 
 const slides = [
   {
@@ -81,7 +82,7 @@ const Landing = ({ onGetStarted, onSignIn }: LandingProps) => {
           {/* Dots */}
           <div className="mb-8 flex gap-2">
           {slides.map((_, i) => (
-            <button
+            <PressableButton
               key={i}
               onClick={() => emblaApi?.scrollTo(i)}
               className={cn(
@@ -95,21 +96,21 @@ const Landing = ({ onGetStarted, onSignIn }: LandingProps) => {
           </div>
 
           {/* CTA */}
-          <button
+          <PressableButton
             onClick={onGetStarted}
             className="w-full rounded-lg bg-white py-4 text-sm font-semibold text-foreground transition-colors hover:bg-white/90"
           >
             Get Started
-          </button>
+          </PressableButton>
 
           <p className="mt-5 text-sm text-white/75">
             Already have an account?{" "}
-            <button
+            <PressableButton
               onClick={onSignIn}
               className="font-semibold text-white hover:underline"
             >
               Sign In
-            </button>
+            </PressableButton>
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import Landing from "./Landing";
 import { CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { PressableButton } from "@/components/ui/pressable-button";
 
 type AuthView = "landing" | "signin" | "signup" | "signup-success";
 
@@ -125,12 +126,12 @@ const Auth = () => {
           <p className="text-sm text-muted-foreground mb-8">
             Your account has been created successfully. You can now sign in.
           </p>
-          <button
+          <PressableButton
             onClick={() => setView("signin")}
             className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Sign In Now
-          </button>
+          </PressableButton>
         </div>
       </div>
     );
@@ -193,13 +194,13 @@ const Auth = () => {
                 required
                 minLength={6}
               />
-              <button
+              <PressableButton
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              </PressableButton>
             </div>
           </div>
           {isSignUp && (
@@ -215,42 +216,42 @@ const Auth = () => {
                   required
                   minLength={6}
                 />
-                <button
+                <PressableButton
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                </PressableButton>
               </div>
             </div>
           )}
 
-          <button
+          <PressableButton
             type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
           >
             {loading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
-          </button>
+          </PressableButton>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-          <button
+          <PressableButton
             onClick={() => setView(isSignUp ? "signin" : "signup")}
             className="text-primary font-medium hover:underline"
           >
             {isSignUp ? "Sign in" : "Sign up"}
-          </button>
+          </PressableButton>
         </p>
 
-        <button
+        <PressableButton
           onClick={() => setView("landing")}
           className="block mx-auto mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           ← Back
-        </button>
+        </PressableButton>
       </div>
     </div>
   );

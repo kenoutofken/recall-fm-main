@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
@@ -36,10 +37,36 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
+const buttonPressAnimation = {
+  whileTap: { scale: 0.94, y: 1.5 },
+  transition: {
+    type: "spring",
+    stiffness: 560,
+    damping: 20,
+    mass: 0.6,
+  },
+} as const;
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
+    const classes = cn(
+      buttonVariants({ variant, size, className }),
+      "touch-manipulation will-change-transform"
+    );
+
+    if (asChild) {
+      return <Slot className={classes} ref={ref} {...props} />;
+    }
+
+    return (
+      <motion.button
+        className={classes}
+        ref={ref}
+        type={props.type ?? "button"}
+        {...buttonPressAnimation}
+        {...props}
+      />
+    );
   },
 );
 Button.displayName = "Button";

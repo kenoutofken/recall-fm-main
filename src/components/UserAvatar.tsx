@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { PressableButton } from "@/components/ui/pressable-button";
 
 type ProfileSummary = {
   userId: string;
@@ -317,7 +318,7 @@ const UserAvatar = () => {
 
   return (
     <>
-      <button
+      <PressableButton
         type="button"
         onClick={() => setMenuOpen(true)}
         className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -327,21 +328,21 @@ const UserAvatar = () => {
             {initials}
           </AvatarFallback>
         </Avatar>
-      </button>
+      </PressableButton>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="right" className="flex h-full w-[92vw] flex-col overflow-hidden p-0 sm:max-w-sm">
           <SheetHeader className="border-b border-border px-5 pb-3 pt-5 text-left">
             <SheetTitle className="flex items-center gap-2 font-display">
               {stage !== "menu" && (
-                <button
+                <PressableButton
                   type="button"
                   onClick={() => setStage("menu")}
                   className="-ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-label="Back"
                 >
                   <ArrowLeft size={17} />
-                </button>
+                </PressableButton>
               )}
               {stage === "account" ? "Account" : stage === "following" ? "Following" : "Menu"}
             </SheetTitle>
@@ -358,7 +359,7 @@ const UserAvatar = () => {
                   <p className="truncate text-xs text-muted-foreground">{username ? `@${username}` : user?.email}</p>
                 </div>
 
-                <button
+                <PressableButton
                   type="button"
                   onClick={() => setStage("account")}
                   className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
@@ -369,9 +370,9 @@ const UserAvatar = () => {
                     <span className="block truncate text-xs text-muted-foreground">Display name and username</span>
                   </span>
                   <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
-                </button>
+                </PressableButton>
 
-                <button
+                <PressableButton
                   type="button"
                   onClick={() => setStage("following")}
                   className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
@@ -382,9 +383,9 @@ const UserAvatar = () => {
                     <span className="block truncate text-xs text-muted-foreground">Find people and manage follows</span>
                   </span>
                   <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
-                </button>
+                </PressableButton>
 
-                <button
+                <PressableButton
                   type="button"
                   onClick={openPlaylist}
                   className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
@@ -392,16 +393,16 @@ const UserAvatar = () => {
                   <ListMusic size={18} className="shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 text-sm font-medium text-foreground">My Playlist</span>
                   <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
-                </button>
+                </PressableButton>
 
-                <button
+                <PressableButton
                   type="button"
                   onClick={signOut}
                   className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <LogOut size={18} className="shrink-0" />
                   <span className="min-w-0 flex-1 text-sm font-medium">Sign out</span>
-                </button>
+                </PressableButton>
               </div>
 
               <div className={panelClass}>

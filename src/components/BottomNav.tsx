@@ -2,6 +2,7 @@ import { BookOpen, Compass, Plus } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
+import { PressableButton } from "@/components/ui/pressable-button";
 
 interface BottomNavProps {
   onNewMemory?: () => void;
@@ -44,12 +45,13 @@ const BottomNav = ({ onNewMemory }: BottomNavProps) => {
         </NavLink>
 
         <div className="flex justify-center">
-          <button
+          <PressableButton
             onClick={onNewMemory}
             className="flex items-center justify-center w-12 h-12 -mt-5 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+            whileTap={{ scale: 0.88, y: 2 }}
           >
             <Plus size={22} />
-          </button>
+          </PressableButton>
         </div>
 
         <NavLink

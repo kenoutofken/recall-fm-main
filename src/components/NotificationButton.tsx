@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { PressableButton } from "@/components/ui/pressable-button";
 
 type ProfileSummary = {
   username: string | null;
@@ -204,7 +205,7 @@ const NotificationButton = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button
+        <PressableButton
           type="button"
           className={cn(
             "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -221,21 +222,21 @@ const NotificationButton = () => {
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
-        </button>
+        </PressableButton>
       </SheetTrigger>
       <SheetContent side="right" className="flex h-full w-[92vw] flex-col overflow-hidden p-0 sm:max-w-sm">
         <SheetHeader className="border-b border-border px-5 pb-3 pt-5 text-left">
           <div className="flex items-center justify-between gap-3 pr-8">
             <SheetTitle className="font-display">Notifications</SheetTitle>
             {notifications.length > 0 && (
-              <button
+              <PressableButton
                 type="button"
                 onClick={clearNotifications}
                 disabled={clearing}
                 className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               >
                 {clearing ? "Clearing" : "Clear all"}
-              </button>
+              </PressableButton>
             )}
           </div>
         </SheetHeader>
