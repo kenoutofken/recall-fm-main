@@ -50,7 +50,7 @@ interface AddMemoryFormProps {
     isPublic: boolean;
     imageUrl?: string | null;
     tags?: string[];
-  }) => void;
+  }) => Promise<boolean>;
   onClose: () => void;
   editingMemory?: Memory | null;
 }
@@ -380,7 +380,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     }
     if (!title || !songTitle || !artist || selectedMoods.length === 0) return;
     const imageUrl = await uploadImage();
-    onAdd({
+    const saved = await onAdd({
       title,
       description,
       songTitle,
@@ -398,7 +398,9 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
       imageUrl,
       tags: selectedTags,
     });
-    onClose();
+    if (saved) {
+      onClose();
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

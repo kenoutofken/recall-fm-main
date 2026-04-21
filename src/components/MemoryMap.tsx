@@ -393,10 +393,6 @@ const MemoryMap = ({ memories }: MemoryMapProps) => {
         </button>
       </div>
 
-      <div className="absolute bottom-3 left-3 z-[1000] rounded-lg border border-border bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
-        {points.length} {points.length === 1 ? "pin" : "pins"} · zoom {zoom}
-      </div>
-
       {!apiKey && (
         <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
           Add VITE_GEOAPIFY_API_KEY to .env and restart the dev server to load map tiles.

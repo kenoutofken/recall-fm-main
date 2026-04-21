@@ -154,9 +154,11 @@ const Playlist = () => {
 
       {showForm && (
         <AddMemoryForm
-          onAdd={(data) => {
-            addMemory(data);
-            navigate("/journal");
+          onAdd={async (data) => {
+            const createdMemory = await addMemory(data);
+            if (!createdMemory) return false;
+            navigate(`/journal/memories/${createdMemory.id}`);
+            return true;
           }}
           onClose={() => setShowForm(false)}
           editingMemory={null}

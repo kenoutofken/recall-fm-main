@@ -9,6 +9,46 @@ export function useMemories() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const mapMemoryRecord = useCallback((r: {
+    id: string;
+    title: string;
+    description: string | null;
+    song_title: string;
+    artist: string;
+    date: string;
+    memory_year: number | null;
+    memory_season: string | null;
+    location_name: string | null;
+    location_lat: number | null;
+    location_lng: number | null;
+    location_place_id: string | null;
+    mood: string;
+    people: string[] | null;
+    is_public: boolean | null;
+    image_url: string | null;
+    tags: string[] | null;
+    created_at: string;
+  }): Memory => ({
+    id: r.id,
+    title: r.title,
+    description: r.description ?? "",
+    songTitle: r.song_title,
+    artist: r.artist,
+    date: r.date,
+    memoryYear: r.memory_year ?? null,
+    memorySeason: r.memory_season ?? null,
+    locationName: r.location_name ?? null,
+    locationLat: r.location_lat ?? null,
+    locationLng: r.location_lng ?? null,
+    locationPlaceId: r.location_place_id ?? null,
+    mood: r.mood,
+    people: r.people ?? [],
+    isPublic: r.is_public ?? false,
+    imageUrl: r.image_url ?? null,
+    tags: r.tags ?? [],
+    createdAt: r.created_at,
+  }), []);
+
   const fetchMemories = useCallback(async () => {
     if (!user) { setMemories([]); setLoading(false); return; }
     const { data, error } = await supabase
@@ -21,31 +61,10 @@ export function useMemories() {
       toast.error("Failed to load memories");
       console.error(error);
     } else {
-      setMemories(
-        (data ?? []).map((r) => ({
-          id: r.id,
-          title: r.title,
-          description: r.description ?? "",
-          songTitle: r.song_title,
-          artist: r.artist,
-          date: r.date,
-          memoryYear: r.memory_year ?? null,
-          memorySeason: r.memory_season ?? null,
-          locationName: r.location_name ?? null,
-          locationLat: r.location_lat ?? null,
-          locationLng: r.location_lng ?? null,
-          locationPlaceId: r.location_place_id ?? null,
-          mood: r.mood,
-          people: r.people ?? [],
-          isPublic: r.is_public ?? false,
-          imageUrl: r.image_url ?? null,
-          tags: r.tags ?? [],
-          createdAt: r.created_at,
-        }))
-      );
+      setMemories((data ?? []).map(mapMemoryRecord));
     }
     setLoading(false);
-  }, [user]);
+  }, [mapMemoryRecord, user]);
 
   useEffect(() => {
     fetchMemories();
@@ -76,32 +95,38 @@ export function useMemories() {
   }, [user, fetchMemories]);
 
   const addMemory = async (memory: Omit<Memory, "id" | "createdAt">) => {
-    if (!user) return;
-    const { error } = await supabase.from("memories").insert({
-      user_id: user.id,
-      title: memory.title,
-      description: memory.description,
-      song_title: memory.songTitle,
-      artist: memory.artist,
-      date: memory.date,
-      memory_year: memory.memoryYear ?? null,
-      memory_season: memory.memorySeason ?? null,
-      location_name: memory.locationName ?? null,
-      location_lat: memory.locationLat ?? null,
-      location_lng: memory.locationLng ?? null,
-      location_place_id: memory.locationPlaceId ?? null,
-      mood: memory.mood,
-      people: memory.people,
-      is_public: memory.isPublic,
-      image_url: memory.imageUrl ?? null,
-      tags: memory.tags ?? [],
-    });
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from("memories")
+      .insert({
+        user_id: user.id,
+        title: memory.title,
+        description: memory.description,
+        song_title: memory.songTitle,
+        artist: memory.artist,
+        date: memory.date,
+        memory_year: memory.memoryYear ?? null,
+        memory_season: memory.memorySeason ?? null,
+        location_name: memory.locationName ?? null,
+        location_lat: memory.locationLat ?? null,
+        location_lng: memory.locationLng ?? null,
+        location_place_id: memory.locationPlaceId ?? null,
+        mood: memory.mood,
+        people: memory.people,
+        is_public: memory.isPublic,
+        image_url: memory.imageUrl ?? null,
+        tags: memory.tags ?? [],
+      })
+      .select("*")
+      .single();
     if (error) {
       toast.error(error.message || "Failed to save memory");
       console.error(error);
+      return null;
     } else {
       toast.success("Memory saved!");
       fetchMemories();
+      return mapMemoryRecord(data);
     }
   };
 
@@ -127,9 +152,11 @@ export function useMemories() {
     if (error) {
       toast.error(error.message || "Failed to update memory");
       console.error(error);
+      return false;
     } else {
       toast.success("Memory updated!");
       fetchMemories();
+      return true;
     }
   };
 

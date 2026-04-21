@@ -512,13 +512,15 @@ const Index = () => {
 
       {showForm && (
         <AddMemoryForm
-          onAdd={(data) => {
+          onAdd={async (data) => {
             const memoryData = { ...data, tags: data.tags ?? [] };
             if (editingMemory) {
-              updateMemory(editingMemory.id, memoryData);
+              return await updateMemory(editingMemory.id, memoryData);
             } else {
-              addMemory(memoryData);
-              navigate("/journal");
+              const createdMemory = await addMemory(memoryData);
+              if (!createdMemory) return false;
+              navigate(`/journal/memories/${createdMemory.id}`);
+              return true;
             }
           }}
           onClose={() => { setShowForm(false); setEditingMemory(null); }}
