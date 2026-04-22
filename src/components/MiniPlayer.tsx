@@ -68,6 +68,15 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
     setProgress(0);
   }, []);
 
+  const pausePlayback = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    autoStartedRef.current = false;
+    if (autoPlay) userPausedAutoRef.current = true;
+    setPlaying(false);
+  }, [autoPlay]);
+
   const startPlayback = useCallback((startedByAutoPlay = false) => {
     if (!audioRef.current || !track) return;
     autoStartedRef.current = startedByAutoPlay;
@@ -103,6 +112,11 @@ const MiniPlayer = ({ songTitle, artist, autoPlay = false, variant = "default" }
     window.addEventListener("recallfm:preview-play", handlePreviewPlay);
     return () => window.removeEventListener("recallfm:preview-play", handlePreviewPlay);
   }, [playerId, stopPlayback]);
+
+  useEffect(() => {
+    window.addEventListener("recallfm:preview-pause-all", pausePlayback);
+    return () => window.removeEventListener("recallfm:preview-pause-all", pausePlayback);
+  }, [pausePlayback]);
 
   const togglePlay = () => {
     if (!audioRef.current || !track) return;

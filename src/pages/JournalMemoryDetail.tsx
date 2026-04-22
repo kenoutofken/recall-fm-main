@@ -6,6 +6,7 @@ import MiniPlayer from "@/components/MiniPlayer";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMemories } from "@/hooks/useMemories";
 import { useLikes } from "@/hooks/useLikes";
 import { usePlaylist } from "@/hooks/usePlaylist";
@@ -15,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type DetailLocationState = {
   from?: {
@@ -27,6 +29,7 @@ const JournalMemoryDetail = () => {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { memories, loading, updateMemory, deleteMemory } = useMemories();
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
   const [publicMemory, setPublicMemory] = useState<Memory | null>(null);
@@ -35,6 +38,7 @@ const JournalMemoryDetail = () => {
 
   const isDiscoverDetail = location.pathname.startsWith("/discover/");
   const memory = useMemo(() => {
+    // Journal details use the user's local memory list; Discover details fetch one public row.
     if (isDiscoverDetail) return publicMemory;
     return memories.find((item) => item.id === id) ?? null;
   }, [id, isDiscoverDetail, memories, publicMemory]);
@@ -47,7 +51,9 @@ const JournalMemoryDetail = () => {
     : backPath;
   const { likeCounts, userLikes, toggleLike } = useLikes(memory ? [memory.id] : []);
   const { songs, addSong, removeSong, isSongInPlaylist } = usePlaylist();
-  const canEditMemory = Boolean(memory && !isDiscoverDetail);
+  const canEditMemory = Boolean(memory && (!isDiscoverDetail || memory.userId === user?.id));
+  const isLiked = Boolean(memory && userLikes.has(memory.id));
+  const isInPlaylist = Boolean(memory && isSongInPlaylist(memory.songTitle, memory.artist));
 
   useEffect(() => {
     if (!isDiscoverDetail || !id) {
@@ -60,6 +66,7 @@ const JournalMemoryDetail = () => {
     let cancelled = false;
 
     const fetchPublicMemory = async () => {
+      // Public detail pages are restricted to memories that are still marked public.
       setPublicLoading(true);
       setPublicChecked(false);
       const { data, error } = await supabase
@@ -88,6 +95,7 @@ const JournalMemoryDetail = () => {
       if (cancelled) return;
 
       setPublicMemory({
+        // Convert the Supabase row into the same Memory shape used by journal-owned entries.
         id: data.id,
         title: data.title,
         description: data.description ?? "",
@@ -125,12 +133,33 @@ const JournalMemoryDetail = () => {
   const pageLoading = isDiscoverDetail ? publicLoading || !publicChecked : loading;
 
   const handleDelete = async () => {
+    // Deleting from the detail page returns to the view the user came from.
     if (!memory) return;
     await deleteMemory(memory.id);
     navigate(returnPath, { replace: true });
   };
 
+  const handleUpdateMemory = async (data: Omit<Memory, "id" | "createdAt">) => {
+    if (!editingMemory) return false;
+
+    const saved = await updateMemory(editingMemory.id, { ...data, tags: data.tags ?? [] });
+    if (!saved) return false;
+
+    if (isDiscoverDetail) {
+      setPublicMemory((current) => current && current.id === editingMemory.id
+        ? {
+          ...current,
+          ...data,
+          tags: data.tags ?? [],
+        }
+        : current);
+    }
+
+    return true;
+  };
+
   const togglePlaylist = () => {
+    // Discover memories can be saved to or removed from the user's playlist without copying the memory.
     if (!memory) return;
     const inList = isSongInPlaylist(memory.songTitle, memory.artist);
 
@@ -147,6 +176,13 @@ const JournalMemoryDetail = () => {
 
     addSong(memory.songTitle, memory.artist, memory.id);
     toast.success("Added to your playlist!");
+  };
+
+  const handleToggleLike = () => {
+    if (!memory) return;
+
+    toggleLike(memory.id);
+    toast.success(isLiked ? "Removed like" : "Liked this memory!");
   };
 
   return (
@@ -169,14 +205,61 @@ const JournalMemoryDetail = () => {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 pb-24">
-        <button
-          type="button"
-          onClick={() => navigate(returnPath)}
-          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronLeft size={18} />
-          {backLabel}
-        </button>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(returnPath)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft size={18} />
+            {backLabel}
+          </button>
+
+          {isDiscoverDetail && memory && (
+            <div className="flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleToggleLike}
+                    aria-label={isLiked ? "Unlike this memory" : "Like this memory"}
+                    className={cn(
+                      "relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isLiked && "border-primary text-primary"
+                    )}
+                  >
+                    <Heart size={18} className={isLiked ? "fill-primary" : ""} />
+                    {(likeCounts[memory.id] || 0) > 0 && (
+                      <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+                        {likeCounts[memory.id]}
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{isLiked ? "Unlike" : "Like"}</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={togglePlaylist}
+                    aria-label={isInPlaylist ? "Remove from playlist" : "Add to playlist"}
+                    className={cn(
+                      "inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isInPlaylist
+                        ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "border-border bg-card text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {isInPlaylist ? <Minus size={18} /> : <Plus size={18} />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{isInPlaylist ? "Remove from playlist" : "Add to playlist"}</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
+        </div>
 
         {pageLoading ? (
           <p className="text-center text-sm text-muted-foreground py-20">Loading memory...</p>
@@ -264,86 +347,57 @@ const JournalMemoryDetail = () => {
               )}
             </div>
 
-            {isDiscoverDetail ? (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const wasLiked = userLikes.has(memory.id);
-                    toggleLike(memory.id);
-                    toast.success(wasLiked ? "Removed like" : "Liked this memory!");
-                  }}
-                  className={cn(
-                    "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    userLikes.has(memory.id) && "border-primary text-primary"
-                  )}
-                >
-                  <Heart size={16} className={userLikes.has(memory.id) ? "fill-primary" : ""} />
-                  Like{(likeCounts[memory.id] || 0) > 0 ? ` ${likeCounts[memory.id]}` : ""}
-                </button>
-                <button
-                  type="button"
-                  onClick={togglePlaylist}
-                  className={cn(
-                    "inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isSongInPlaylist(memory.songTitle, memory.artist)
-                      ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "border-border bg-card text-foreground hover:bg-muted"
-                  )}
-                >
-                  {isSongInPlaylist(memory.songTitle, memory.artist) ? <Minus size={16} /> : <Plus size={16} />}
-                  Playlist
-                </button>
-              </div>
-            ) : canEditMemory && (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingMemory(memory)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                <Pencil size={16} />
-                Edit
-              </button>
-              <Sheet>
-                <SheetTrigger asChild>
+            {canEditMemory && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => setEditingMemory(memory)}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                   >
-                    <Trash2 size={16} />
-                    Delete
+                    <Pencil size={16} />
+                    Edit
                   </button>
-                </SheetTrigger>
-                <SheetContent side="right" className="flex w-[86vw] max-w-sm flex-col p-0">
-                  <SheetHeader className="border-b border-border px-5 py-5 text-left">
-                    <SheetTitle>Delete this memory?</SheetTitle>
-                  </SheetHeader>
-                  <div className="flex flex-1 flex-col justify-between gap-6 px-5 py-5">
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      This will permanently remove "{memory.title}" from your journal.
-                    </p>
-                    <div className="grid gap-2">
-                      <SheetClose asChild>
-                        <button
-                          type="button"
-                          className="h-11 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                        >
-                          Cancel
-                        </button>
-                      </SheetClose>
+                  <Sheet>
+                    <SheetTrigger asChild>
                       <button
                         type="button"
-                        onClick={handleDelete}
-                        className="h-11 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
                       >
-                        Delete Memory
+                        <Trash2 size={16} />
+                        Delete
                       </button>
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="flex w-[86vw] max-w-sm flex-col p-0">
+                      <SheetHeader className="border-b border-border px-5 py-5 text-left">
+                        <SheetTitle>Delete this memory?</SheetTitle>
+                      </SheetHeader>
+                      <div className="flex flex-1 flex-col justify-between gap-6 px-5 py-5">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          This will permanently remove "{memory.title}" from your journal.
+                        </p>
+                        <div className="grid gap-2">
+                          <SheetClose asChild>
+                            <button
+                              type="button"
+                              className="h-11 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            >
+                              Cancel
+                            </button>
+                          </SheetClose>
+                          <button
+                            type="button"
+                            onClick={handleDelete}
+                            className="h-11 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                          >
+                            Delete Memory
+                          </button>
+                        </div>
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+              </div>
             )}
           </article>
         )}
@@ -351,7 +405,7 @@ const JournalMemoryDetail = () => {
 
       {editingMemory && (
         <AddMemoryForm
-          onAdd={(data) => updateMemory(editingMemory.id, { ...data, tags: data.tags ?? [] })}
+          onAdd={handleUpdateMemory}
           onClose={() => setEditingMemory(null)}
           editingMemory={editingMemory}
         />

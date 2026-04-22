@@ -46,7 +46,10 @@ const BottomNav = ({ onNewMemory }: BottomNavProps) => {
 
         <div className="flex justify-center">
           <PressableButton
-            onClick={onNewMemory}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("recallfm:preview-pause-all"));
+              onNewMemory?.();
+            }}
             className="flex items-center justify-center w-12 h-12 -mt-5 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
             whileTap={{ scale: 0.88, y: 2 }}
           >

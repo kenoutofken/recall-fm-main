@@ -44,6 +44,7 @@ const SORT_MODES: MemorySortMode[] = ["newest", "oldest", "title", "song", "arti
 const LIST_ONLY_SORT_MODES: MemorySortMode[] = ["title", "song", "artist"];
 const SEASON_COUNT = MEMORY_SEASONS.length;
 
+// URL values are parsed defensively so copied/shared journal links never break the page.
 const parseViewMode = (value: string | null): ViewMode => {
   return VIEW_MODES.includes(value as ViewMode) ? (value as ViewMode) : "cards";
 };
@@ -86,6 +87,7 @@ const Index = () => {
   const [timelineSeasonRange, setTimelineSeasonRange] = useState<[number, number] | null>(null);
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
 
+  // Keep the journal view/sort controls synced with query params for refreshes and back/forward navigation.
   useEffect(() => {
     const nextViewMode = parseViewMode(searchParams.get("view"));
     const nextSortMode = parseSortMode(searchParams.get("sort"), nextViewMode);
@@ -155,6 +157,11 @@ const Index = () => {
     setLocationPlaceId(null);
   };
 
+  const openNewMemoryForm = () => {
+    window.dispatchEvent(new CustomEvent("recallfm:preview-pause-all"));
+    setShowForm(true);
+  };
+
   const updateLocationFilter = (name: string, location?: LocationResult | null) => {
     setLocationName(name);
 
@@ -176,6 +183,7 @@ const Index = () => {
   const LIST_POSTS_PER_PAGE = 20;
   const [page, setPage] = useState(1);
 
+  // Convert each memory into a season bucket so the range slider can filter by Spring/Summer/Fall/Winter.
   const timelineSeasonBounds = useMemo(() => {
     const buckets = memories
       .map(getMemorySeasonBucket)
@@ -221,6 +229,7 @@ const Index = () => {
   const activeFilterCount = selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0) + (timelineSeasonRangeActive ? 1 : 0);
 
   const filtered = useMemo(() => {
+    // All journal filters are composed here so every view receives the same result set.
     let result = memories;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -282,6 +291,7 @@ const Index = () => {
   const memoriesPerPage = viewMode === "list" ? LIST_POSTS_PER_PAGE : TIMELINE_POSTS_PER_PAGE;
 
   const paginatedMemories = useMemo(() => {
+    // Timeline and list views progressively reveal results to keep long journals quick to scan.
     return sortedFiltered.slice(0, page * memoriesPerPage);
   }, [memoriesPerPage, sortedFiltered, page]);
 
@@ -386,7 +396,7 @@ const Index = () => {
             </p>
             {!hasActiveFilters && (
               <button
-                onClick={() => setShowForm(true)}
+                onClick={openNewMemoryForm}
                 className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Create your first memory
@@ -492,7 +502,7 @@ const Index = () => {
         )}
       </main>
 
-      <BottomNav onNewMemory={() => setShowForm(true)} />
+      <BottomNav onNewMemory={openNewMemoryForm} />
 
       <FilterDrawer
         open={showFilters}
