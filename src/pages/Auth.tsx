@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import Landing from "./Landing";
 import { CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { PressableButton } from "@/components/ui/pressable-button";
+import BrandMark from "@/components/BrandMark";
 
 type AuthView = "landing" | "signin" | "signup" | "signup-success";
 
@@ -148,7 +149,9 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold text-gradient mb-2">Recall.fm</h1>
+          <h1 className="mb-2 flex justify-center">
+            <BrandMark className="text-gradient [&>span:first-child]:h-10 [&>span:first-child]:w-10 [&>span:last-child]:text-3xl" />
+          </h1>
           <p className="text-sm text-muted-foreground">
             {isSignUp ? "Create your account" : "Welcome back"}
           </p>

@@ -62,7 +62,7 @@ const Landing = ({ onGetStarted, onSignIn }: LandingProps) => {
               <div className="relative z-10 flex min-h-screen flex-col items-center justify-end px-6 pb-56 pt-20 text-center">
                 <div className="w-full max-w-sm">
                   <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-                    Recall.fm
+                    LifePlayback
                   </p>
                   <h2 className="font-display text-4xl font-semibold leading-tight text-white">
                     {slide.title}

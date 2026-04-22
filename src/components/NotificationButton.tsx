@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { PressableButton } from "@/components/ui/pressable-button";
+import { toast } from "sonner";
 
 type ProfileSummary = {
   username: string | null;
@@ -43,6 +44,8 @@ const NotificationButton = () => {
   const [loading, setLoading] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [followSavingId, setFollowSavingId] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     // Notifications store ids only, so this joins actor profiles and memory titles for display.
@@ -69,7 +72,7 @@ const NotificationButton = () => {
     const actorIds = Array.from(new Set(rawNotifications.map((notification) => notification.actor_id).filter(Boolean)));
     const memoryIds = Array.from(new Set(rawNotifications.map((notification) => notification.memory_id).filter(Boolean)));
 
-    const [profilesResult, memoriesResult] = await Promise.all([
+    const [profilesResult, memoriesResult, followingResult] = await Promise.all([
       actorIds.length > 0
         ? supabase
             .from("profiles")
@@ -82,10 +85,17 @@ const NotificationButton = () => {
             .select("id, title, song_title")
             .in("id", memoryIds)
         : Promise.resolve({ data: [], error: null }),
+      actorIds.length > 0
+        ? supabase
+            .from("follows")
+            .select("following_id")
+            .eq("follower_id", user.id)
+            .in("following_id", actorIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (profilesResult.error || memoriesResult.error) {
-      console.error(profilesResult.error ?? memoriesResult.error);
+    if (profilesResult.error || memoriesResult.error || followingResult.error) {
+      console.error(profilesResult.error ?? memoriesResult.error ?? followingResult.error);
       setLoading(false);
       return;
     }
@@ -99,6 +109,7 @@ const NotificationButton = () => {
         },
       ]),
     );
+    setFollowingIds(new Set((followingResult.data ?? []).map((follow) => follow.following_id)));
 
     const memoriesById = new Map<string, OwnedMemorySummary>(
       (memoriesResult.data ?? []).map((memory) => [
@@ -185,6 +196,24 @@ const NotificationButton = () => {
     navigate(`/journal/memories/${memoryId}`);
   };
 
+  const followBack = async (notification: NotificationItem) => {
+    if (!user || !notification.actorId || followSavingId === notification.actorId) return;
+
+    setFollowSavingId(notification.actorId);
+    const { error } = await supabase
+      .from("follows")
+      .insert({ follower_id: user.id, following_id: notification.actorId });
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setFollowingIds((current) => new Set(current).add(notification.actorId as string));
+      toast.success(`Following ${notification.actorName}`);
+    }
+
+    setFollowSavingId(null);
+  };
+
   const clearNotifications = async () => {
     // Clear all is optimistic; if the delete fails, the previous list is restored.
     if (!user || notifications.length === 0 || clearing) return;
@@ -260,41 +289,64 @@ const NotificationButton = () => {
               {notifications.map((notification) => {
                 const isUnread = !notification.readAt;
                 const Icon = notification.type === "memory_like" ? Heart : UserPlus;
+                const canFollowBack = (
+                  notification.type === "follow" &&
+                  Boolean(notification.actorId) &&
+                  !followingIds.has(notification.actorId as string)
+                );
                 return (
-                  <button
+                  <div
                     key={notification.id}
-                    type="button"
-                    onClick={() => notification.memory && openMemory(notification.memory.id)}
-                    disabled={!notification.memory}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors",
                       notification.memory ? "hover:bg-muted" : "cursor-default",
                     )}
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                        notification.type === "memory_like" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
-                      )}
                     >
-                      <Icon size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm leading-snug text-foreground">
-                        <span className="font-medium">{notification.actorName}</span>{" "}
-                        {notification.type === "memory_like" ? "liked your memory" : "followed you"}
+                    <button
+                      type="button"
+                      onClick={() => notification.memory && openMemory(notification.memory.id)}
+                      disabled={!notification.memory}
+                      className="flex min-w-0 flex-1 items-start gap-3 text-left disabled:cursor-default"
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                          notification.type === "memory_like" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+                        )}
+                      >
+                        <Icon size={16} />
                       </span>
-                      {notification.memory && (
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                          {notification.memory.title}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm leading-snug text-foreground">
+                          <span className="font-medium">{notification.actorName}</span>{" "}
+                          {notification.type === "memory_like" ? "liked your memory" : "followed you"}
                         </span>
-                      )}
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        {notification.memory && (
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {notification.memory.title}
+                          </span>
+                        )}
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        </span>
                       </span>
-                    </span>
+                    </button>
+                    {canFollowBack && (
+                      <PressableButton
+                        type="button"
+                        onClick={() => followBack(notification)}
+                        disabled={followSavingId === notification.actorId}
+                        className="mt-0.5 shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        {followSavingId === notification.actorId ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          "Follow back"
+                        )}
+                      </PressableButton>
+                    )}
                     {isUnread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                  </button>
+                  </div>
                 );
               })}
             </div>

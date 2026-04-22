@@ -4,6 +4,7 @@ import { Trash2, Copy, ExternalLink, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
+import BrandMark from "@/components/BrandMark";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
@@ -34,9 +35,9 @@ const Playlist = () => {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="font-display text-xl font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              className="rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Recall.fm
+              <BrandMark />
             </button>
             <span className="text-muted-foreground/30">|</span>
             <h1 className="font-display text-xl font-normal text-foreground">My Playlist</h1>

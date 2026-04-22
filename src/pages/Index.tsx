@@ -9,6 +9,7 @@ import Timeline, { MemorySortMode, ViewMode, sortMemories } from "@/components/T
 import AddMemoryForm from "@/components/AddMemoryForm";
 import MemoryMap from "@/components/MemoryMap";
 import BottomNav from "@/components/BottomNav";
+import BrandMark from "@/components/BrandMark";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
@@ -309,9 +310,9 @@ const Index = () => {
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="font-display text-xl font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className="rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Recall.fm
+            <BrandMark />
           </button>
           <div className="flex items-center gap-2">
             <NotificationButton />
