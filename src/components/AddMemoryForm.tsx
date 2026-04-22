@@ -118,7 +118,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
   const [customMoodInput, setCustomMoodInput] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>(editingMemory?.tags ?? []);
   const [customTagInput, setCustomTagInput] = useState("");
-  const [isPublic, setIsPublic] = useState(editingMemory?.isPublic ?? false);
+  const [isPublic, setIsPublic] = useState(editingMemory?.isPublic ?? true);
   const [imagePreview, setImagePreview] = useState<string | null>(editingMemory?.imageUrl ?? null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
