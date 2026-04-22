@@ -51,19 +51,168 @@ interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
+type DragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  active: boolean;
+};
+
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
-  ({ side = "right", className, children, ...props }, ref) => (
-    <SheetPortal>
-      <SheetOverlay />
-      <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-        {children}
-        <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </SheetPrimitive.Close>
-      </SheetPrimitive.Content>
-    </SheetPortal>
-  ),
+  ({ side = "right", className, children, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, ...props }, ref) => {
+    const contentRef = React.useRef<React.ElementRef<typeof SheetPrimitive.Content> | null>(null);
+    const closeRef = React.useRef<HTMLButtonElement | null>(null);
+    const dragRef = React.useRef<DragState | null>(null);
+
+    const setRefs = React.useCallback((node: React.ElementRef<typeof SheetPrimitive.Content> | null) => {
+      contentRef.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+    }, [ref]);
+
+    const resetDrag = React.useCallback(() => {
+      if (contentRef.current) {
+        contentRef.current.style.transform = "";
+        contentRef.current.style.transition = "";
+      }
+      dragRef.current = null;
+    }, []);
+
+    const getCloseOffset = React.useCallback((clientX: number, clientY: number) => {
+      const state = dragRef.current;
+      if (!state) return 0;
+
+      switch (side) {
+        case "left":
+          return Math.max(0, state.startX - clientX);
+        case "right":
+          return Math.max(0, clientX - state.startX);
+        case "top":
+          return Math.max(0, state.startY - clientY);
+        case "bottom":
+        default:
+          return Math.max(0, clientY - state.startY);
+      }
+    }, [side]);
+
+    const setCloseTransform = React.useCallback((offset: number) => {
+      if (!contentRef.current) return;
+      contentRef.current.style.transition = "none";
+
+      if (side === "left") {
+        contentRef.current.style.transform = `translateX(-${offset}px)`;
+      } else if (side === "right") {
+        contentRef.current.style.transform = `translateX(${offset}px)`;
+      } else if (side === "top") {
+        contentRef.current.style.transform = `translateY(-${offset}px)`;
+      } else {
+        contentRef.current.style.transform = `translateY(${offset}px)`;
+      }
+    }, [side]);
+
+    const canStartDrag = React.useCallback((event: React.PointerEvent<React.ElementRef<typeof SheetPrimitive.Content>>) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+
+      if (side === "left") return event.clientX >= rect.right - 72;
+      if (side === "right") return event.clientX <= rect.left + 72;
+      if (side === "top") return event.clientY >= rect.bottom - 96;
+      return event.clientY <= rect.top + 96;
+    }, [side]);
+
+    const finishDrag = React.useCallback((event: React.PointerEvent<React.ElementRef<typeof SheetPrimitive.Content>>) => {
+      const state = dragRef.current;
+      if (!state) return;
+
+      const offset = getCloseOffset(event.clientX, event.clientY);
+      const content = contentRef.current;
+      const closeThreshold = Math.min(
+        160,
+        side === "left" || side === "right"
+          ? (content?.offsetWidth ?? 320) * 0.33
+          : (content?.offsetHeight ?? 320) * 0.22,
+      );
+
+      event.currentTarget.releasePointerCapture(state.pointerId);
+      resetDrag();
+
+      if (state.active && offset > closeThreshold) {
+        closeRef.current?.click();
+      }
+    }, [getCloseOffset, resetDrag, side]);
+
+    return (
+      <SheetPortal>
+        <SheetOverlay />
+        <SheetPrimitive.Content
+          ref={setRefs}
+          className={cn(sheetVariants({ side }), className)}
+          onPointerDown={(event) => {
+            onPointerDown?.(event);
+            if (event.defaultPrevented || event.button !== 0) return;
+            if (!canStartDrag(event)) return;
+
+            dragRef.current = {
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startY: event.clientY,
+              active: false,
+            };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            onPointerMove?.(event);
+            const state = dragRef.current;
+            if (!state) return;
+
+            const closeOffset = getCloseOffset(event.clientX, event.clientY);
+            const crossOffset = side === "left" || side === "right"
+              ? Math.abs(event.clientY - state.startY)
+              : Math.abs(event.clientX - state.startX);
+
+            if (!state.active && closeOffset > 12 && closeOffset > crossOffset) {
+              state.active = true;
+            }
+
+            if (state.active) {
+              event.preventDefault();
+              setCloseTransform(closeOffset);
+            }
+          }}
+          onPointerUp={(event) => {
+            onPointerUp?.(event);
+            finishDrag(event);
+          }}
+          onPointerCancel={(event) => {
+            onPointerCancel?.(event);
+            resetDrag();
+          }}
+          {...props}
+        >
+          <div
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute rounded-full bg-muted-foreground/30",
+              side === "bottom" && "left-1/2 top-3 h-1.5 w-12 -translate-x-1/2",
+              side === "top" && "bottom-3 left-1/2 h-1.5 w-12 -translate-x-1/2",
+              side === "right" && "left-3 top-1/2 h-12 w-1.5 -translate-y-1/2",
+              side === "left" && "right-3 top-1/2 h-12 w-1.5 -translate-y-1/2",
+            )}
+          />
+          {children}
+          <SheetPrimitive.Close
+            ref={closeRef}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        </SheetPrimitive.Content>
+      </SheetPortal>
+    );
+  },
 );
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 

@@ -18,6 +18,12 @@ type FormStep = 0 | 1 | 2;
 const FORM_STEPS = ["Memory", "Song & Date", "Details"] as const;
 const FLOW_STEPS = ["AI Fill", ...FORM_STEPS] as const;
 
+type PanelDragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+};
+
 type DraftMemory = {
   title?: unknown;
   description?: unknown;
@@ -125,6 +131,8 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
   const [generating, setGenerating] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const dragRef = useRef<PanelDragState | null>(null);
 
   // AI Fill returns plain mood names, so this maps them back to the app's emoji labels when possible.
   const normalizeMood = (mood: string) => {
@@ -415,6 +423,69 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     e.preventDefault();
   };
 
+  const resetPanelDrag = () => {
+    if (formRef.current) {
+      formRef.current.style.transform = "";
+      formRef.current.style.transition = "";
+    }
+    dragRef.current = null;
+  };
+
+  const getCloseOffset = (clientX: number, clientY: number) => {
+    if (!dragRef.current) return 0;
+    return editingMemory
+      ? Math.max(0, dragRef.current.startX - clientX)
+      : Math.max(0, clientY - dragRef.current.startY);
+  };
+
+  const setPanelTransform = (offset: number) => {
+    if (!formRef.current) return;
+    formRef.current.style.transition = "none";
+    formRef.current.style.transform = editingMemory ? `translateX(-${offset}px)` : `translateY(${offset}px)`;
+  };
+
+  const handlePanelPointerDown = (event: React.PointerEvent<HTMLFormElement>) => {
+    if (event.button !== 0) return;
+    if (!(event.target instanceof HTMLElement) || !event.target.closest("[data-drag-close-handle]")) return;
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePanelPointerMove = (event: React.PointerEvent<HTMLFormElement>) => {
+    if (!dragRef.current) return;
+
+    const closeOffset = getCloseOffset(event.clientX, event.clientY);
+    const crossOffset = editingMemory
+      ? Math.abs(event.clientY - dragRef.current.startY)
+      : Math.abs(event.clientX - dragRef.current.startX);
+
+    if (closeOffset > 12 && closeOffset > crossOffset) {
+      event.preventDefault();
+      setPanelTransform(closeOffset);
+    }
+  };
+
+  const handlePanelPointerUp = (event: React.PointerEvent<HTMLFormElement>) => {
+    if (!dragRef.current) return;
+
+    const closeOffset = getCloseOffset(event.clientX, event.clientY);
+    const threshold = Math.min(160, editingMemory
+      ? (formRef.current?.offsetWidth ?? 320) * 0.33
+      : (formRef.current?.offsetHeight ?? 320) * 0.22);
+
+    event.currentTarget.releasePointerCapture(dragRef.current.pointerId);
+    resetPanelDrag();
+
+    if (closeOffset > threshold) {
+      onClose();
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -424,7 +495,12 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
       onClick={onClose}
     >
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
+        onPointerDown={handlePanelPointerDown}
+        onPointerMove={handlePanelPointerMove}
+        onPointerUp={handlePanelPointerUp}
+        onPointerCancel={resetPanelDrag}
         onKeyDown={(e) => {
           if (e.key === "Enter" && e.target instanceof HTMLElement && e.target.tagName !== "TEXTAREA") {
             e.preventDefault();
@@ -438,7 +514,10 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
             : "h-[92dvh] w-full rounded-t-2xl slide-in-from-bottom sm:h-auto sm:max-h-[90vh] sm:max-w-lg"
         )}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div data-drag-close-handle className="relative mb-6 flex cursor-grab touch-none items-center justify-between active:cursor-grabbing">
+          {!editingMemory && (
+            <span className="absolute left-1/2 top-[-14px] h-1.5 w-12 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
+          )}
           <h2 className="font-display text-xl font-semibold">
             {editingMemory ? "Edit Memory" : stage === "ai" ? "Start a Memory" : "New Music Memory"}
           </h2>
