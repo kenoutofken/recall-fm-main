@@ -32,15 +32,15 @@ const AudioToggleButton = () => {
         <button
           type="button"
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-transparent text-foreground transition-all hover:scale-105 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             effectiveMuted
-              ? "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              : "bg-primary text-primary-foreground hover:bg-primary/90",
+              ? "text-muted-foreground hover:text-foreground"
+              : "text-foreground",
           )}
           aria-label="Audio settings"
           title={effectiveMuted ? "Sound off" : `Volume ${volumePercent}%`}
         >
-          <VolumeIcon size={16} />
+          <VolumeIcon size={20} strokeWidth={2.6} />
         </button>
       </SheetTrigger>
       <SheetContent side="right" className="flex h-full w-[92vw] flex-col overflow-hidden p-0 sm:max-w-sm">

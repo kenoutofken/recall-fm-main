@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Discover from "./pages/Discover";
 import JournalMemoryDetail from "./pages/JournalMemoryDetail";
 import Playlist from "./pages/Playlist";
+import WhatsNew from "./pages/WhatsNew";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/journal" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/journal/memories/:id" element={<ProtectedRoute><JournalMemoryDetail /></ProtectedRoute>} />
               <Route path="/playlist" element={<ProtectedRoute><Playlist /></ProtectedRoute>} />
+              <Route path="/whats-new" element={<ProtectedRoute><WhatsNew /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AudioSettingsProvider>

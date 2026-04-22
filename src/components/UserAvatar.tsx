@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ChevronRight, Loader2, LogOut, ListMusic, Search, Trash2, User, UserCheck, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, LogOut, ListMusic, Megaphone, Search, Trash2, User, UserCheck, UserPlus, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,8 +35,6 @@ const UserAvatar = () => {
   const [userResults, setUserResults] = useState<ProfileSummary[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [followSavingId, setFollowSavingId] = useState<string | null>(null);
-
-  const initials = user?.email ? user.email.substring(0, 2).toUpperCase() : "??";
 
   const loadFollowing = useCallback(async () => {
     if (!user) return;
@@ -236,6 +234,11 @@ const UserAvatar = () => {
     navigate("/playlist");
   };
 
+  const openWhatsNew = () => {
+    setMenuOpen(false);
+    navigate("/whats-new");
+  };
+
   const openProfile = (profile: ProfileSummary) => {
     setMenuOpen(false);
     navigate(`/?profile=${encodeURIComponent(profile.userId)}&username=${encodeURIComponent(profile.username)}`);
@@ -315,6 +318,7 @@ const UserAvatar = () => {
 
   const stageIndex = stage === "menu" ? 0 : stage === "account" ? 1 : 2;
   const panelClass = "min-w-full w-full shrink-0 space-y-4 overflow-y-auto px-5 py-5";
+  const stageTitle = stage === "account" ? "Account" : stage === "following" ? "Following" : "Menu";
 
   return (
     <>
@@ -323,9 +327,9 @@ const UserAvatar = () => {
         onClick={() => setMenuOpen(true)}
         className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-            {initials}
+        <Avatar className="h-9 w-9 shadow-sm ring-1 ring-primary/15">
+          <AvatarFallback className="bg-primary text-primary-foreground">
+            <User size={18} strokeWidth={2.5} />
           </AvatarFallback>
         </Avatar>
       </PressableButton>
@@ -344,7 +348,7 @@ const UserAvatar = () => {
                   <ArrowLeft size={17} />
                 </PressableButton>
               )}
-              {stage === "account" ? "Account" : stage === "following" ? "Following" : "Menu"}
+              {stageTitle}
             </SheetTitle>
           </SheetHeader>
 
@@ -392,6 +396,19 @@ const UserAvatar = () => {
                 >
                   <ListMusic size={18} className="shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 text-sm font-medium text-foreground">My Playlist</span>
+                  <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
+                </PressableButton>
+
+                <PressableButton
+                  type="button"
+                  onClick={openWhatsNew}
+                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
+                >
+                  <Megaphone size={18} className="shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">What's new</span>
+                    <span className="block truncate text-xs text-muted-foreground">Latest LifePlayback updates</span>
+                  </span>
                   <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
                 </PressableButton>
 

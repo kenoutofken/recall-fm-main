@@ -241,15 +241,15 @@ const NotificationButton = () => {
         <PressableButton
           type="button"
           className={cn(
-            "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-transparent text-foreground transition-all hover:scale-105 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             unreadCount > 0
-              ? "bg-primary text-primary-foreground hover:bg-primary/90"
-              : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+              ? "text-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
           aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
           title="Notifications"
         >
-          <Bell size={16} />
+          <Bell size={20} strokeWidth={2.6} />
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}

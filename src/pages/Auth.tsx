@@ -150,7 +150,7 @@ const Auth = () => {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="mb-2 flex justify-center">
-            <BrandMark className="text-gradient [&>span:first-child]:h-10 [&>span:first-child]:w-10 [&>span:last-child]:text-3xl" />
+            <BrandMark className="[&>svg]:size-5 [&>span]:text-3xl" />
           </h1>
           <p className="text-sm text-muted-foreground">
             {isSignUp ? "Create your account" : "Welcome back"}
