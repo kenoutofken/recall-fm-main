@@ -4,6 +4,7 @@ import { Calendar, ChevronLeft, Heart, MapPin, Minus, Pencil, Plus, Trash2, User
 import AddMemoryForm from "@/components/AddMemoryForm";
 import MiniPlayer from "@/components/MiniPlayer";
 import BrandMark from "@/components/BrandMark";
+import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
@@ -31,8 +32,9 @@ const JournalMemoryDetail = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { memories, loading, updateMemory, deleteMemory } = useMemories();
+  const { memories, loading, addMemory, updateMemory, deleteMemory } = useMemories();
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [publicMemory, setPublicMemory] = useState<Memory | null>(null);
   const [publicLoading, setPublicLoading] = useState(false);
   const [publicChecked, setPublicChecked] = useState(false);
@@ -156,6 +158,14 @@ const JournalMemoryDetail = () => {
         : current);
     }
 
+    return true;
+  };
+
+  const handleAddMemory = async (data: Omit<Memory, "id" | "createdAt">) => {
+    const createdMemory = await addMemory({ ...data, tags: data.tags ?? [] });
+    if (!createdMemory) return false;
+
+    navigate(`/journal/memories/${createdMemory.id}`);
     return true;
   };
 
@@ -404,11 +414,21 @@ const JournalMemoryDetail = () => {
         )}
       </main>
 
+      <BottomNav onNewMemory={() => setShowForm(true)} />
+
       {editingMemory && (
         <AddMemoryForm
           onAdd={handleUpdateMemory}
           onClose={() => setEditingMemory(null)}
           editingMemory={editingMemory}
+        />
+      )}
+
+      {showForm && (
+        <AddMemoryForm
+          onAdd={handleAddMemory}
+          onClose={() => setShowForm(false)}
+          editingMemory={null}
         />
       )}
     </div>
