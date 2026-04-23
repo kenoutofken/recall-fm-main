@@ -4,7 +4,21 @@ import { useMemories } from "@/hooks/useMemories";
 import { useAuth } from "@/contexts/AuthContext";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import { Memory, MOODS, MEMORY_TYPES } from "@/types/memory";
-import { Calendar, SlidersHorizontal, X, Search, Heart, Plus, Minus, ChevronLeft, ChevronRight, Sparkles, UserPlus, UserCheck, MapPin } from "lucide-react";
+import {
+  Calendar,
+  SlidersHorizontal,
+  X,
+  Search,
+  Heart,
+  Plus,
+  Minus,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  UserPlus,
+  UserCheck,
+  MapPin,
+} from "lucide-react";
 import AISuggestDrawer from "@/components/AISuggestDrawer";
 import FilterDrawer from "@/components/FilterDrawer";
 import { useLikes } from "@/hooks/useLikes";
@@ -25,7 +39,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { formatMemoryTime } from "@/lib/memoryTime";
 import { matchesLocationFilter } from "@/lib/locationFilter";
 import type { LocationResult } from "@/components/LocationSearch";
@@ -58,18 +77,24 @@ const MOOD_GRADIENTS: Record<string, string> = {
 
 const getMoodGradient = (mood: string) => {
   const first = mood.split(",")[0].trim();
-  const label = MOODS.find((m) => first.includes(m.label))?.label ?? "Nostalgic";
-  return MOOD_GRADIENTS[label] ?? "bg-gradient-to-br from-muted to-muted-foreground/20";
+  const label =
+    MOODS.find((m) => first.includes(m.label))?.label ?? "Nostalgic";
+  return (
+    MOOD_GRADIENTS[label] ??
+    "bg-gradient-to-br from-muted to-muted-foreground/20"
+  );
 };
 
-const getMoodParts = (mood: string) => (
+const getMoodParts = (mood: string) =>
   mood
     .split(",")
     .map((part) => part.trim())
-    .filter(Boolean)
-);
+    .filter(Boolean);
 
-const getTrendingScore = (memory: Memory, engagement: EngagementCounts | undefined) => {
+const getTrendingScore = (
+  memory: Memory,
+  engagement: EngagementCounts | undefined,
+) => {
   const likes = engagement?.likes ?? 0;
   const playlistAdds = engagement?.playlistAdds ?? 0;
   const ageInDays = Math.max(
@@ -78,7 +103,7 @@ const getTrendingScore = (memory: Memory, engagement: EngagementCounts | undefin
   );
   const freshnessBoost = Math.max(0, 10 - ageInDays) * 0.35;
 
-  return (likes * 1) + (playlistAdds * 2.5) + freshnessBoost;
+  return likes * 1 + playlistAdds * 2.5 + freshnessBoost;
 };
 
 const topControlButtonClassName =
@@ -112,49 +137,70 @@ const Discover = () => {
   const [aiFilterIds, setAiFilterIds] = useState<string[] | null>(null);
   const [aiReason, setAiReason] = useState("");
   const [feedMode, setFeedMode] = useState<FeedMode>("community");
-  const [profileFilter, setProfileFilter] = useState<{ userId: string; username: string } | null>(null);
+  const [profileFilter, setProfileFilter] = useState<{
+    userId: string;
+    username: string;
+  } | null>(null);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [userResults, setUserResults] = useState<ProfileResult[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [followSavingId, setFollowSavingId] = useState<string | null>(null);
-  const [engagementByMemoryId, setEngagementByMemoryId] = useState<Record<string, EngagementCounts>>({});
+  const [engagementByMemoryId, setEngagementByMemoryId] = useState<
+    Record<string, EngagementCounts>
+  >({});
   const isDraggingCardRef = useRef(false);
 
   useEffect(() => {
-    const restore = (location.state as { restore?: {
-      searchQuery?: string;
-      selectedMoods?: string[];
-      selectedTags?: string[];
-      dateFilter?: string | null;
-      locationName?: string;
-      locationLat?: number | null;
-      locationLng?: number | null;
-      locationPlaceId?: string | null;
-      currentIndex?: number;
-      aiFilterIds?: string[] | null;
-      aiReason?: string;
-      feedMode?: FeedMode;
-      profileFilter?: { userId: string; username: string } | null;
-      scrollY?: number;
-    } } | null)?.restore;
+    const restore = (
+      location.state as {
+        restore?: {
+          searchQuery?: string;
+          selectedMoods?: string[];
+          selectedTags?: string[];
+          dateFilter?: string | null;
+          locationName?: string;
+          locationLat?: number | null;
+          locationLng?: number | null;
+          locationPlaceId?: string | null;
+          currentIndex?: number;
+          aiFilterIds?: string[] | null;
+          aiReason?: string;
+          feedMode?: FeedMode;
+          profileFilter?: { userId: string; username: string } | null;
+          scrollY?: number;
+        };
+      } | null
+    )?.restore;
 
     if (!restore) return;
 
     setSearchQuery(restore.searchQuery ?? "");
-    setSelectedMoods(Array.isArray(restore.selectedMoods) ? restore.selectedMoods : []);
-    setSelectedTags(Array.isArray(restore.selectedTags) ? restore.selectedTags : []);
-    setDateFilter(restore.dateFilter ? new Date(restore.dateFilter) : undefined);
+    setSelectedMoods(
+      Array.isArray(restore.selectedMoods) ? restore.selectedMoods : [],
+    );
+    setSelectedTags(
+      Array.isArray(restore.selectedTags) ? restore.selectedTags : [],
+    );
+    setDateFilter(
+      restore.dateFilter ? new Date(restore.dateFilter) : undefined,
+    );
     setLocationName(restore.locationName ?? "");
     setLocationLat(restore.locationLat ?? null);
     setLocationLng(restore.locationLng ?? null);
     setLocationPlaceId(restore.locationPlaceId ?? null);
-    setAiFilterIds(Array.isArray(restore.aiFilterIds) ? restore.aiFilterIds : restore.aiFilterIds ?? null);
+    setAiFilterIds(
+      Array.isArray(restore.aiFilterIds)
+        ? restore.aiFilterIds
+        : (restore.aiFilterIds ?? null),
+    );
     setAiReason(restore.aiReason ?? "");
     setFeedMode(restore.feedMode === "following" ? "following" : "community");
     setProfileFilter(restore.profileFilter ?? null);
-    setCurrentIndex(typeof restore.currentIndex === "number" ? restore.currentIndex : 0);
+    setCurrentIndex(
+      typeof restore.currentIndex === "number" ? restore.currentIndex : 0,
+    );
 
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: restore.scrollY ?? 0, behavior: "auto" });
@@ -210,7 +256,10 @@ const Discover = () => {
     setFollowingIds(new Set((data ?? []).map((follow) => follow.following_id)));
   }, [user]);
 
-  const toggleFollow = async (profile: { userId: string; username: string }) => {
+  const toggleFollow = async (profile: {
+    userId: string;
+    username: string;
+  }) => {
     // Follow/unfollow is optimistic in local state, then refreshed from Supabase for consistency.
     if (!user) {
       toast.error("Sign in before following people");
@@ -240,7 +289,11 @@ const Discover = () => {
         else next.add(profile.userId);
         return next;
       });
-      toast.success(isFollowing ? `Unfollowed @${profile.username}` : `Following @${profile.username}`);
+      toast.success(
+        isFollowing
+          ? `Unfollowed @${profile.username}`
+          : `Following @${profile.username}`,
+      );
     }
     await fetchFollowing();
     setFollowSavingId(null);
@@ -259,20 +312,23 @@ const Discover = () => {
       console.error(error);
     } else {
       const rows = data ?? [];
-      const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)));
-      const { data: profiles, error: profilesError } = userIds.length > 0
-        ? await supabase
-            .from("profiles")
-            .select("user_id, username, display_name, avatar_url")
-            .in("user_id", userIds)
-        : { data: [], error: null };
+      const userIds = Array.from(
+        new Set(rows.map((r) => r.user_id).filter(Boolean)),
+      );
+      const { data: profiles, error: profilesError } =
+        userIds.length > 0
+          ? await supabase
+              .from("profiles")
+              .select("user_id, username, display_name, avatar_url")
+              .in("user_id", userIds)
+          : { data: [], error: null };
 
       if (profilesError) {
         console.error(profilesError);
       }
 
       const profilesByUserId = new Map(
-        (profiles ?? []).map((profile) => [profile.user_id, profile])
+        (profiles ?? []).map((profile) => [profile.user_id, profile]),
       );
 
       setMemories(
@@ -303,7 +359,7 @@ const Discover = () => {
             displayName: profile?.display_name ?? null,
             avatarUrl: profile?.avatar_url ?? null,
           };
-        })
+        }),
       );
     }
     setLoading(false);
@@ -382,7 +438,7 @@ const Discover = () => {
         },
         () => {
           fetchPublic();
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -393,7 +449,7 @@ const Discover = () => {
         },
         () => {
           fetchPublic();
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -404,7 +460,7 @@ const Discover = () => {
         },
         () => {
           fetchEngagementCounts(memories.map((memory) => memory.id));
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -415,7 +471,7 @@ const Discover = () => {
         },
         () => {
           fetchEngagementCounts(memories.map((memory) => memory.id));
-        }
+        },
       )
       .subscribe();
 
@@ -443,7 +499,7 @@ const Discover = () => {
         },
         () => {
           fetchFollowing();
-        }
+        },
       )
       .subscribe();
 
@@ -478,13 +534,15 @@ const Discover = () => {
         } else {
           setUserResults(
             (data ?? [])
-              .filter((profile) => profile.username && profile.user_id !== user?.id)
+              .filter(
+                (profile) => profile.username && profile.user_id !== user?.id,
+              )
               .map((profile) => ({
                 userId: profile.user_id,
                 username: profile.username!,
                 displayName: profile.display_name,
                 avatarUrl: profile.avatar_url,
-              }))
+              })),
           );
         }
         setUserSearchLoading(false);
@@ -499,13 +557,13 @@ const Discover = () => {
 
   const toggleMood = (mood: string) => {
     setSelectedMoods((prev) =>
-      prev.includes(mood) ? prev.filter((m) => m !== mood) : [...prev, mood]
+      prev.includes(mood) ? prev.filter((m) => m !== mood) : [...prev, mood],
     );
   };
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   };
 
@@ -523,7 +581,10 @@ const Discover = () => {
     setProfileFilter(null);
   };
 
-  const updateLocationFilter = (name: string, location?: LocationResult | null) => {
+  const updateLocationFilter = (
+    name: string,
+    location?: LocationResult | null,
+  ) => {
     setLocationName(name);
 
     if (location === null) {
@@ -542,7 +603,14 @@ const Discover = () => {
 
   const trimmedSearchQuery = searchQuery.trim();
   const hasSearchQuery = trimmedSearchQuery.length > 0;
-  const hasActiveFilters = hasSearchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName || aiFilterIds !== null || profileFilter !== null;
+  const hasActiveFilters =
+    hasSearchQuery ||
+    selectedMoods.length > 0 ||
+    selectedTags.length > 0 ||
+    dateFilter ||
+    locationName ||
+    aiFilterIds !== null ||
+    profileFilter !== null;
 
   const filtered = useMemo(() => {
     // Feed mode, AI suggestions, search, and manual filters all narrow the same public-memory list.
@@ -550,7 +618,9 @@ const Discover = () => {
     if (profileFilter) {
       result = result.filter((m) => m.userId === profileFilter.userId);
     } else if (feedMode === "following") {
-      result = result.filter((m) => Boolean(m.userId && followingIds.has(m.userId)));
+      result = result.filter((m) =>
+        Boolean(m.userId && followingIds.has(m.userId)),
+      );
     }
     // AI filter takes priority because its result order comes from the matching edge function.
     if (aiFilterIds !== null) {
@@ -568,7 +638,7 @@ const Discover = () => {
           m.mood.toLowerCase().includes(q) ||
           (m.locationName?.toLowerCase().includes(q) ?? false) ||
           m.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-          m.people.some((p) => p.toLowerCase().includes(q))
+          m.people.some((p) => p.toLowerCase().includes(q)),
       );
     }
     if (selectedMoods.length > 0) {
@@ -579,7 +649,7 @@ const Discover = () => {
     }
     if (selectedTags.length > 0) {
       result = result.filter((m) =>
-        selectedTags.some((tag) => m.tags.includes(tag))
+        selectedTags.some((tag) => m.tags.includes(tag)),
       );
     }
     if (dateFilter) {
@@ -591,29 +661,54 @@ const Discover = () => {
       });
     }
     if (locationName) {
-      result = result.filter((m) => matchesLocationFilter(m, {
-        name: locationName,
-        lat: locationLat,
-        lng: locationLng,
-        placeId: locationPlaceId,
-      }));
+      result = result.filter((m) =>
+        matchesLocationFilter(m, {
+          name: locationName,
+          lat: locationLat,
+          lng: locationLng,
+          placeId: locationPlaceId,
+        }),
+      );
     }
 
     if (!profileFilter && feedMode === "community" && aiFilterIds === null) {
-      result = [...result].sort((a, b) => {
-        const scoreDiff = getTrendingScore(b, engagementByMemoryId[b.id]) - getTrendingScore(a, engagementByMemoryId[a.id]);
-        if (scoreDiff !== 0) return scoreDiff;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
+      result = [...result].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
     }
 
     return result;
-  }, [memories, profileFilter, feedMode, followingIds, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, aiFilterIds, engagementByMemoryId]);
+  }, [
+    memories,
+    profileFilter,
+    feedMode,
+    followingIds,
+    hasSearchQuery,
+    trimmedSearchQuery,
+    selectedMoods,
+    selectedTags,
+    dateFilter,
+    locationName,
+    locationLat,
+    locationLng,
+    locationPlaceId,
+    aiFilterIds,
+    engagementByMemoryId,
+  ]);
 
   // Reset the swipe deck to the first card when the active feed changes.
   useEffect(() => {
     setCurrentIndex(0);
-  }, [searchQuery, selectedMoods, selectedTags, dateFilter, locationName, profileFilter, feedMode]);
+  }, [
+    searchQuery,
+    selectedMoods,
+    selectedTags,
+    dateFilter,
+    locationName,
+    profileFilter,
+    feedMode,
+  ]);
 
   const memoryIds = useMemo(() => filtered.map((m) => m.id), [filtered]);
   const { likeCounts, userLikes, toggleLike } = useLikes(memoryIds);
@@ -633,7 +728,10 @@ const Discover = () => {
     }
   }, [currentIndex]);
 
-  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (
+    _event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo,
+  ) => {
     // Horizontal drag offsets act like next/previous buttons for the card deck.
     if (info.offset.x < -SWIPE_THRESHOLD) goNext();
     else if (info.offset.x > SWIPE_THRESHOLD) goPrev();
@@ -677,7 +775,10 @@ const Discover = () => {
 
       <main className="flex-1 min-h-0 max-w-lg mx-auto w-full px-4 py-4 pb-24 flex flex-col">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <AppBreadcrumbs items={[{ label: "Discover" }]} className="mb-0 min-w-0" />
+          <AppBreadcrumbs
+            items={[{ label: "Discover" }]}
+            className="mb-0 min-w-0"
+          />
           {!profileFilter && (
             <div className="grid shrink-0 grid-cols-2 rounded-full border border-border bg-card p-1 shadow-sm">
               <button
@@ -688,7 +789,7 @@ const Discover = () => {
                   "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                   feedMode === "community"
                     ? "bg-primary text-primary-foreground"
-                    : "text-foreground hover:bg-muted"
+                    : "text-foreground hover:bg-muted",
                 )}
               >
                 Everyone
@@ -701,7 +802,7 @@ const Discover = () => {
                   "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                   feedMode === "following"
                     ? "bg-primary text-primary-foreground"
-                    : "text-foreground hover:bg-muted"
+                    : "text-foreground hover:bg-muted",
                 )}
               >
                 Following
@@ -712,7 +813,10 @@ const Discover = () => {
         {/* Search and Filter Button */}
         <div className="flex items-center gap-2 mb-4">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               placeholder="Quick search memories…"
               value={searchQuery}
@@ -720,7 +824,10 @@ const Discover = () => {
               className={topSearchInputClassName}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
                 <X size={14} />
               </button>
             )}
@@ -734,7 +841,8 @@ const Discover = () => {
             className={cn(
               topControlButtonClassName,
               "shrink-0",
-              (showAISuggest || aiFilterIds !== null) && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+              (showAISuggest || aiFilterIds !== null) &&
+                "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
             )}
             aria-label="AI suggest posts"
             title="AI Suggest posts"
@@ -750,7 +858,8 @@ const Discover = () => {
             className={cn(
               topControlButtonClassName,
               "shrink-0",
-              showUserSearch && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+              showUserSearch &&
+                "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
             )}
             aria-label="Find followers and users"
             title="Find users"
@@ -766,14 +875,22 @@ const Discover = () => {
             className={cn(
               topControlButtonClassName,
               "shrink-0",
-              showFilters && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+              showFilters &&
+                "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
             )}
             aria-label="Open filters"
           >
             <SlidersHorizontal size={16} />
-            {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)) > 0 && (
+            {selectedMoods.length +
+              selectedTags.length +
+              (dateFilter ? 1 : 0) +
+              (locationName ? 1 : 0) >
+              0 && (
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)}
+                {selectedMoods.length +
+                  selectedTags.length +
+                  (dateFilter ? 1 : 0) +
+                  (locationName ? 1 : 0)}
               </span>
             )}
           </motion.button>
@@ -783,9 +900,14 @@ const Discover = () => {
         {aiFilterIds !== null && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
             <Sparkles size={14} className="text-primary shrink-0" />
-            <p className="text-xs text-foreground flex-1">{aiReason || "Showing AI-curated results"}</p>
+            <p className="text-xs text-foreground flex-1">
+              {aiReason || "Showing AI-curated results"}
+            </p>
             <button
-              onClick={() => { setAiFilterIds(null); setAiReason(""); }}
+              onClick={() => {
+                setAiFilterIds(null);
+                setAiReason("");
+              }}
               className="text-muted-foreground hover:text-foreground"
             >
               <X size={14} />
@@ -797,7 +919,9 @@ const Discover = () => {
           <div className="card-strong mb-3 flex items-center gap-2 rounded-lg px-3 py-2">
             <div className="flex-1 min-w-0">
               <p className="text-xs text-muted-foreground">Viewing profile</p>
-              <p className="text-sm font-medium text-foreground truncate">@{profileFilter.username}</p>
+              <p className="text-sm font-medium text-foreground truncate">
+                @{profileFilter.username}
+              </p>
             </div>
             {user?.id !== profileFilter.userId && (
               <button
@@ -807,7 +931,7 @@ const Discover = () => {
                   "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                   followingIds.has(profileFilter.userId)
                     ? "bg-muted text-foreground hover:bg-muted/80"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
                 )}
               >
                 {followingIds.has(profileFilter.userId) ? "Unfollow" : "Follow"}
@@ -824,16 +948,16 @@ const Discover = () => {
 
         {/* Card area */}
         {loading ? (
-          <p className="text-center text-sm text-muted-foreground py-20">Loading discoveries...</p>
+          <p className="text-center text-sm text-muted-foreground py-20">
+            Loading discoveries...
+          </p>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-4xl mb-4">{hasActiveFilters ? "🔍" : "🌍"}</p>
             <h2 className="font-display text-lg font-semibold text-foreground mb-2">
               {emptyTitle}
             </h2>
-            <p className="text-sm text-muted-foreground">
-              {emptyMessage}
-            </p>
+            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
           </div>
         ) : profileFilter || hasSearchQuery ? (
           <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pb-2">
@@ -850,19 +974,28 @@ const Discover = () => {
                   <div className="flex items-center gap-3">
                     <span className="text-lg shrink-0">{firstEmoji}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{mem.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {mem.title}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {mem.songTitle} — {mem.artist}
                       </p>
                       {moodParts.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {moodParts.slice(0, 2).map((mood) => (
-                            <Badge key={mood} variant="secondary" className="px-2 py-0 text-[10px] font-medium">
+                            <Badge
+                              key={mood}
+                              variant="secondary"
+                              className="px-2 py-0 text-[10px] font-medium"
+                            >
                               {mood}
                             </Badge>
                           ))}
                           {moodParts.length > 2 && (
-                            <Badge variant="outline" className="px-2 py-0 text-[10px] font-medium text-muted-foreground">
+                            <Badge
+                              variant="outline"
+                              className="px-2 py-0 text-[10px] font-medium text-muted-foreground"
+                            >
                               +{moodParts.length - 2}
                             </Badge>
                           )}
@@ -871,7 +1004,9 @@ const Discover = () => {
                       {mem.locationName && (
                         <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                           <MapPin size={10} className="shrink-0" />
-                          <span className="min-w-0 truncate">{mem.locationName}</span>
+                          <span className="min-w-0 truncate">
+                            {mem.locationName}
+                          </span>
                         </p>
                       )}
                     </div>
@@ -879,27 +1014,48 @@ const Discover = () => {
                       <Calendar size={11} />
                       <span>{formatMemoryTime(mem)}</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="flex items-center gap-2 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         onClick={() => {
                           const wasLiked = userLikes.has(mem.id);
                           toggleLike(mem.id);
-                          toast.success(wasLiked ? "Removed like" : "Liked this memory!");
+                          toast.success(
+                            wasLiked ? "Removed like" : "Liked this memory!",
+                          );
                         }}
                         className={cn(
                           "rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          userLikes.has(mem.id) && "text-foreground"
+                          userLikes.has(mem.id) && "text-foreground",
                         )}
-                        aria-label={userLikes.has(mem.id) ? "Unlike memory" : "Like memory"}
+                        aria-label={
+                          userLikes.has(mem.id)
+                            ? "Unlike memory"
+                            : "Like memory"
+                        }
                       >
-                        <Heart size={16} className={userLikes.has(mem.id) ? "fill-foreground" : ""} />
+                        <Heart
+                          size={16}
+                          className={
+                            userLikes.has(mem.id) ? "fill-foreground" : ""
+                          }
+                        />
                       </button>
                       <button
                         onClick={() => {
-                          const inList = isSongInPlaylist(mem.songTitle, mem.artist);
+                          const inList = isSongInPlaylist(
+                            mem.songTitle,
+                            mem.artist,
+                          );
                           if (inList) {
                             const song = songs.find(
-                              (s) => s.songTitle.toLowerCase() === mem.songTitle.toLowerCase() && s.artist.toLowerCase() === mem.artist.toLowerCase()
+                              (s) =>
+                                s.songTitle.toLowerCase() ===
+                                  mem.songTitle.toLowerCase() &&
+                                s.artist.toLowerCase() ===
+                                  mem.artist.toLowerCase(),
                             );
                             if (song) {
                               removeSong(song.id);
@@ -915,14 +1071,26 @@ const Discover = () => {
                           isSongInPlaylist(mem.songTitle, mem.artist)
                             ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
                             : "border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-foreground",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         )}
-                        aria-label={isSongInPlaylist(mem.songTitle, mem.artist) ? "Remove from playlist" : "Add to playlist"}
+                        aria-label={
+                          isSongInPlaylist(mem.songTitle, mem.artist)
+                            ? "Remove from playlist"
+                            : "Add to playlist"
+                        }
                       >
-                        {isSongInPlaylist(mem.songTitle, mem.artist) ? <Minus size={13} /> : <Plus size={13} />}
+                        {isSongInPlaylist(mem.songTitle, mem.artist) ? (
+                          <Minus size={13} />
+                        ) : (
+                          <Plus size={13} />
+                        )}
                         <span>Playlist</span>
                       </button>
-                      <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} variant="compact" />
+                      <MiniPlayer
+                        songTitle={mem.songTitle}
+                        artist={mem.artist}
+                        variant="compact"
+                      />
                     </div>
                   </div>
                 </div>
@@ -943,145 +1111,198 @@ const Discover = () => {
                   const moodParts = getMoodParts(mem.mood);
 
                   return (
-                  <motion.div
-                    key={mem.id}
-                    className={cn(
-                      "relative min-w-0 shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full overflow-hidden rounded-lg",
-                      i === currentIndex ? "opacity-100" : "opacity-40"
-                    )}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.4}
-                    onClick={() => {
-                      if (isDraggingCardRef.current) return;
-                      openMemoryDetail(mem);
-                    }}
-                    onDragStart={() => {
-                      isDraggingCardRef.current = true;
-                    }}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <div className={cn("absolute inset-0", !mem.imageUrl && getMoodGradient(mem.mood))}>
-                      {mem.imageUrl && <img src={mem.imageUrl} alt="" className="size-full object-cover" />}
-                      <div className="absolute inset-0 bg-black/50" />
-                      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/88 via-black/45 to-transparent" />
-                    </div>
-
-                    {mem.locationName && (
-                      <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-4.5rem)] min-w-0 overflow-hidden items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-                        <MapPin size={12} className="shrink-0" />
-                        <span className="block min-w-0 truncate">{mem.locationName}</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 space-y-4 p-4 text-white">
-                      <div className="min-w-0">
-                        {mem.username && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); showProfilePosts(mem); }}
-                            className="mb-2 w-fit rounded-full px-2 py-1 text-xs font-medium text-white/75 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                          >
-                            @{mem.username}
-                          </button>
+                    <motion.div
+                      key={mem.id}
+                      className={cn(
+                        "relative min-w-0 shrink-0 cursor-grab active:cursor-grabbing transition-opacity duration-300 h-full w-full overflow-hidden rounded-lg",
+                        i === currentIndex ? "opacity-100" : "opacity-40",
+                      )}
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0.4}
+                      onClick={() => {
+                        if (isDraggingCardRef.current) return;
+                        openMemoryDetail(mem);
+                      }}
+                      onDragStart={() => {
+                        isDraggingCardRef.current = true;
+                      }}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <div
+                        className={cn(
+                          "absolute inset-0",
+                          !mem.imageUrl && getMoodGradient(mem.mood),
                         )}
-                        {moodParts.length > 0 && (
-                          <div className="mb-2 flex flex-wrap gap-1.5">
-                            {moodParts.slice(0, 3).map((mood) => (
-                              <Badge
-                                key={mood}
-                                variant="secondary"
-                                className="border-white/15 bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm hover:bg-white/18"
-                              >
-                                {mood}
-                              </Badge>
-                            ))}
+                      >
+                        {mem.imageUrl && (
+                          <img
+                            src={mem.imageUrl}
+                            alt=""
+                            className="size-full object-cover"
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-black/50" />
+                        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/88 via-black/45 to-transparent" />
+                      </div>
+
+                      {mem.locationName && (
+                        <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-4.5rem)] min-w-0 overflow-hidden items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                          <MapPin size={12} className="shrink-0" />
+                          <span className="block min-w-0 truncate">
+                            {mem.locationName}
+                          </span>
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 space-y-4 p-4 text-white">
+                        <div className="min-w-0">
+                          {mem.username && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showProfilePosts(mem);
+                              }}
+                              className="mb-2 w-fit rounded-full px-2 py-1 text-xs font-medium text-white/75 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                            >
+                              @{mem.username}
+                            </button>
+                          )}
+                          {moodParts.length > 0 && (
+                            <div className="mb-2 flex flex-wrap gap-1.5">
+                              {moodParts.slice(0, 3).map((mood) => (
+                                <Badge
+                                  key={mood}
+                                  variant="secondary"
+                                  className="border-white/15 bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm hover:bg-white/18"
+                                >
+                                  {mood}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <h3 className="min-w-0 max-w-full break-words font-display text-2xl font-semibold leading-tight">
+                            {mem.title}
+                          </h3>
+                          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-white/72">
+                            <Calendar size={12} />
+                            <span>{formatMemoryTime(mem)}</span>
                           </div>
-                        )}
-                        <h3 className="min-w-0 max-w-full break-words font-display text-2xl font-semibold leading-tight">
-                          {mem.title}
-                        </h3>
-                        <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-white/72">
-                          <Calendar size={12} />
-                          <span>{formatMemoryTime(mem)}</span>
                         </div>
-                      </div>
 
-                      <MiniPlayer songTitle={mem.songTitle} artist={mem.artist} autoPlay={i === currentIndex} variant="overlay" />
+                        <MiniPlayer
+                          songTitle={mem.songTitle}
+                          artist={mem.artist}
+                          autoPlay={i === currentIndex}
+                          variant="overlay"
+                        />
 
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex shrink-0 items-center gap-3">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const wasLiked = userLikes.has(mem.id);
-                              toggleLike(mem.id);
-                              toast.success(wasLiked ? "Removed like" : "Liked this memory!");
-                            }}
-                            className={cn(
-                              "flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                              userLikes.has(mem.id) && "text-white"
-                            )}
-                          >
-                            <Heart size={18} className={userLikes.has(mem.id) ? "fill-white" : ""} />
-                            {(likeCounts[mem.id] || 0) > 0 && (
-                              <span className="text-xs">{likeCounts[mem.id]}</span>
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const inList = isSongInPlaylist(mem.songTitle, mem.artist);
-                              if (inList) {
-                                const song = songs.find(
-                                  (s) => s.songTitle.toLowerCase() === mem.songTitle.toLowerCase() && s.artist.toLowerCase() === mem.artist.toLowerCase()
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex shrink-0 items-center gap-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const wasLiked = userLikes.has(mem.id);
+                                toggleLike(mem.id);
+                                toast.success(
+                                  wasLiked
+                                    ? "Removed like"
+                                    : "Liked this memory!",
                                 );
-                                if (song) {
-                                  removeSong(song.id);
-                                  toast.success("Removed from your playlist");
+                              }}
+                              className={cn(
+                                "flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                                userLikes.has(mem.id) && "text-white",
+                              )}
+                            >
+                              <Heart
+                                size={18}
+                                className={
+                                  userLikes.has(mem.id) ? "fill-white" : ""
                                 }
-                              } else {
-                                addSong(mem.songTitle, mem.artist, mem.id);
-                                toast.success("Added to your playlist!");
+                              />
+                              {(likeCounts[mem.id] || 0) > 0 && (
+                                <span className="text-xs">
+                                  {likeCounts[mem.id]}
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const inList = isSongInPlaylist(
+                                  mem.songTitle,
+                                  mem.artist,
+                                );
+                                if (inList) {
+                                  const song = songs.find(
+                                    (s) =>
+                                      s.songTitle.toLowerCase() ===
+                                        mem.songTitle.toLowerCase() &&
+                                      s.artist.toLowerCase() ===
+                                        mem.artist.toLowerCase(),
+                                  );
+                                  if (song) {
+                                    removeSong(song.id);
+                                    toast.success("Removed from your playlist");
+                                  }
+                                } else {
+                                  addSong(mem.songTitle, mem.artist, mem.id);
+                                  toast.success("Added to your playlist!");
+                                }
+                              }}
+                              className={cn(
+                                "flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                                isSongInPlaylist(mem.songTitle, mem.artist) &&
+                                  "text-white",
+                              )}
+                              aria-label={
+                                isSongInPlaylist(mem.songTitle, mem.artist)
+                                  ? "Remove from playlist"
+                                  : "Add to playlist"
                               }
-                            }}
-                            className={cn(
-                              "flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                              isSongInPlaylist(mem.songTitle, mem.artist) && "text-white"
-                            )}
-                            aria-label={isSongInPlaylist(mem.songTitle, mem.artist) ? "Remove from playlist" : "Add to playlist"}
-                          >
-                            {isSongInPlaylist(mem.songTitle, mem.artist) ? <Minus size={16} /> : <Plus size={16} />}
-                            <span>Playlist</span>
-                          </button>
-                        </div>
+                            >
+                              {isSongInPlaylist(mem.songTitle, mem.artist) ? (
+                                <Minus size={16} />
+                              ) : (
+                                <Plus size={16} />
+                              )}
+                              <span>Playlist</span>
+                            </button>
+                          </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); goPrev(); }}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          disabled={currentIndex === 0}
-                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-35 disabled:hover:scale-100 disabled:hover:bg-black/55"
-                        >
-                          <ChevronLeft size={16} />
-                          Prev
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); goNext(); }}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          disabled={currentIndex >= filtered.length - 1}
-                          className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-35 disabled:hover:scale-100 disabled:hover:bg-black/55"
-                        >
-                          Next
-                          <ChevronRight size={16} />
-                        </button>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                goPrev();
+                              }}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              disabled={currentIndex === 0}
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-35 disabled:hover:scale-100 disabled:hover:bg-black/55"
+                            >
+                              <ChevronLeft size={16} />
+                              Prev
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                goNext();
+                              }}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              disabled={currentIndex >= filtered.length - 1}
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-medium text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-35 disabled:hover:scale-100 disabled:hover:bg-black/55"
+                            >
+                              Next
+                              <ChevronRight size={16} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
                   );
                 })}
               </div>
-
             </div>
           </div>
         )}
@@ -1103,14 +1324,20 @@ const Discover = () => {
       )}
 
       <Sheet open={showUserSearch} onOpenChange={setShowUserSearch}>
-        <SheetContent side="bottom" className="mx-auto flex h-[85vh] w-full max-w-lg flex-col rounded-t-2xl p-0 sm:h-[70vh]">
+        <SheetContent
+          side="bottom"
+          className="mx-auto flex h-[85vh] w-full max-w-lg flex-col rounded-t-2xl p-0 sm:h-[70vh]"
+        >
           <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5 text-left">
             <SheetTitle className="font-display">Find Users</SheetTitle>
           </SheetHeader>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
               <Input
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
@@ -1121,26 +1348,42 @@ const Discover = () => {
 
             <div className="space-y-2">
               {userSearch.trim().length < 2 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Type at least 2 characters.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Type at least 2 characters.
+                </p>
               ) : userSearchLoading ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Searching...</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Searching...
+                </p>
               ) : userResults.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">No users found.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No users found.
+                </p>
               ) : (
                 userResults.map((profile) => (
-                  <div key={profile.userId} className="card-strong flex items-center gap-3 rounded-lg px-3 py-2.5">
+                  <div
+                    key={profile.userId}
+                    className="card-strong flex items-center gap-3 rounded-lg px-3 py-2.5"
+                  >
                     <button
                       type="button"
                       onClick={() => {
-                        setProfileFilter({ userId: profile.userId, username: profile.username });
+                        setProfileFilter({
+                          userId: profile.userId,
+                          username: profile.username,
+                        });
                         setShowUserSearch(false);
                         setCurrentIndex(0);
                       }}
                       className="flex-1 min-w-0 text-left"
                     >
-                      <p className="text-sm font-medium text-foreground truncate">@{profile.username}</p>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        @{profile.username}
+                      </p>
                       {profile.displayName && (
-                        <p className="text-xs text-muted-foreground truncate">{profile.displayName}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {profile.displayName}
+                        </p>
                       )}
                     </button>
                     <button
@@ -1151,7 +1394,7 @@ const Discover = () => {
                         "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                         followingIds.has(profile.userId)
                           ? "bg-muted text-foreground hover:bg-muted/80"
-                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90",
                       )}
                     >
                       {followingIds.has(profile.userId) ? (

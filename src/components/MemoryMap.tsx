@@ -35,7 +35,26 @@ type MemoryCluster = {
 };
 
 const CLUSTER_RADIUS = 58;
-const FOCUS_CLUSTER_DISTANCE_KM = 250;
+const COUNTRY_CLUSTER_DISTANCE_KM = 2200;
+
+const isLikelyNullIsland = (point: MapPoint) => (
+  Math.abs(point.latitude) < 0.5 && Math.abs(point.longitude) < 0.5
+);
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+
+const getDistanceKm = (a: MapPoint, b: MapPoint) => {
+  const earthRadiusKm = 6371;
+  const latDelta = toRadians(b.latitude - a.latitude);
+  const lngDelta = toRadians(b.longitude - a.longitude);
+  const startLat = toRadians(a.latitude);
+  const endLat = toRadians(b.latitude);
+
+  const haversine = Math.sin(latDelta / 2) ** 2
+    + Math.cos(startLat) * Math.cos(endLat) * Math.sin(lngDelta / 2) ** 2;
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+};
 
 const blankMapStyle: MapStyle = {
   version: 8,
@@ -70,21 +89,6 @@ const getGeoapifyStyle = (apiKey: string): MapStyle => ({
   ],
 });
 
-const toRadians = (value: number) => (value * Math.PI) / 180;
-
-const getDistanceKm = (a: MapPoint, b: MapPoint) => {
-  const earthRadiusKm = 6371;
-  const latDelta = toRadians(b.latitude - a.latitude);
-  const lngDelta = toRadians(b.longitude - a.longitude);
-  const startLat = toRadians(a.latitude);
-  const endLat = toRadians(b.latitude);
-
-  const haversine = Math.sin(latDelta / 2) ** 2
-    + Math.cos(startLat) * Math.cos(endLat) * Math.sin(lngDelta / 2) ** 2;
-
-  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-};
-
 const MemoryMap = ({ memories, detailState, onMemorySelect }: MemoryMapProps) => {
   const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
   const navigate = useNavigate();
@@ -111,6 +115,36 @@ const MemoryMap = ({ memories, detailState, onMemorySelect }: MemoryMapProps) =>
   const pointSignature = useMemo(() => {
     return points.map((point) => `${point.memory.id}:${point.latitude}:${point.longitude}`).join("|");
   }, [points]);
+
+  const viewportPoints = useMemo(() => {
+    if (points.length <= 1) return points;
+
+    const nonNullIslandPoints = points.filter((point) => !isLikelyNullIsland(point));
+    return nonNullIslandPoints.length > 0 ? nonNullIslandPoints : points;
+  }, [points]);
+
+  const dominantRegionPoints = useMemo(() => {
+    if (viewportPoints.length <= 1) return viewportPoints;
+
+    const geographicClusters: MapPoint[][] = [];
+
+    viewportPoints.forEach((point) => {
+      const matchingCluster = geographicClusters.find((cluster) =>
+        cluster.some((clusterPoint) => getDistanceKm(clusterPoint, point) <= COUNTRY_CLUSTER_DISTANCE_KM)
+      );
+
+      if (matchingCluster) {
+        matchingCluster.push(point);
+        return;
+      }
+
+      geographicClusters.push([point]);
+    });
+
+    return geographicClusters.reduce((largestCluster, cluster) => (
+      cluster.length > largestCluster.length ? cluster : largestCluster
+    ), geographicClusters[0]);
+  }, [viewportPoints]);
 
   const mapStyle = useMemo(() => {
     return apiKey ? getGeoapifyStyle(apiKey) : blankMapStyle;
@@ -163,36 +197,13 @@ const MemoryMap = ({ memories, detailState, onMemorySelect }: MemoryMapProps) =>
     return nextClusters;
   }, [mapReady, points, viewportTick]);
 
-  const focusPoints = useMemo(() => {
-    if (points.length <= 1) return points;
-
-    const geographicClusters: MapPoint[][] = [];
-
-    points.forEach((point) => {
-      const existingCluster = geographicClusters.find((cluster) =>
-        cluster.some((clusterPoint) => getDistanceKm(clusterPoint, point) <= FOCUS_CLUSTER_DISTANCE_KM)
-      );
-
-      if (existingCluster) {
-        existingCluster.push(point);
-        return;
-      }
-
-      geographicClusters.push([point]);
-    });
-
-    return geographicClusters.reduce((largestCluster, cluster) => (
-      cluster.length > largestCluster.length ? cluster : largestCluster
-    ), geographicClusters[0]);
-  }, [points]);
-
   useEffect(() => {
     const map = mapRef.current;
-    if (!mapReady || !map || points.length === 0) return;
+    if (!mapReady || !map || dominantRegionPoints.length === 0) return;
 
-    if (points.length === 1) {
+    if (dominantRegionPoints.length === 1) {
       map.flyTo({
-        center: [points[0].longitude, points[0].latitude],
+        center: [dominantRegionPoints[0].longitude, dominantRegionPoints[0].latitude],
         zoom: 11,
         duration: 500,
       });
@@ -200,18 +211,8 @@ const MemoryMap = ({ memories, detailState, onMemorySelect }: MemoryMapProps) =>
       return;
     }
 
-    if (focusPoints.length === 1) {
-      map.flyTo({
-        center: [focusPoints[0].longitude, focusPoints[0].latitude],
-        zoom: 9,
-        duration: 500,
-      });
-      window.setTimeout(() => setViewportTick((tick) => tick + 1), 550);
-      return;
-    }
-
-    const longitudes = focusPoints.map((point) => point.longitude);
-    const latitudes = focusPoints.map((point) => point.latitude);
+    const longitudes = dominantRegionPoints.map((point) => point.longitude);
+    const latitudes = dominantRegionPoints.map((point) => point.latitude);
 
     map.fitBounds(
       [
@@ -220,12 +221,12 @@ const MemoryMap = ({ memories, detailState, onMemorySelect }: MemoryMapProps) =>
       ],
       {
         padding: 64,
-        maxZoom: 12,
+        maxZoom: 6,
         duration: 500,
       },
     );
     window.setTimeout(() => setViewportTick((tick) => tick + 1), 550);
-  }, [focusPoints, mapReady, pointSignature, points]);
+  }, [dominantRegionPoints, mapReady, pointSignature]);
 
   const openClusterPanel = (memoriesInCluster: Memory[]) => {
     setSelectedMemories(memoriesInCluster);
