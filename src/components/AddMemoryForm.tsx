@@ -1,6 +1,6 @@
-import { useState, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MOODS, MEMORY_SEASONS, MEMORY_TYPES } from "@/types/memory";
-import { Music, X, Users, Plus, Globe, Lock, ImagePlus, Loader2, Sparkles, MapPin, CircleHelp } from "lucide-react";
+import { Music, X, Users, Plus, Globe, Lock, ImagePlus, Loader2, Sparkles, MapPin, CircleHelp, Upload } from "lucide-react";
 import SongSearch from "@/components/SongSearch";
 import { compressImage } from "@/lib/compressImage";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,28 @@ type DraftMemory = {
   moods?: unknown;
 };
 
+type LocalDraft = {
+  savedAt: string;
+  stage: FormStage;
+  formStep: FormStep;
+  aiPrompt: string;
+  title: string;
+  description: string;
+  songTitle: string;
+  artist: string;
+  memoryYear: number;
+  memorySeason: string;
+  locationName: string;
+  locationLat: number | null;
+  locationLng: number | null;
+  locationPlaceId: string | null;
+  selectedMoods: string[];
+  people: string[];
+  selectedTags: string[];
+  isPublic: boolean;
+  imagePreview: string | null;
+};
+
 // The form owns the draft/edit state, then sends one normalized memory object back to the journal hook.
 interface AddMemoryFormProps {
   onAdd: (memory: {
@@ -61,6 +83,8 @@ interface AddMemoryFormProps {
   onClose: () => void;
   editingMemory?: Memory | null;
 }
+
+const CREATE_DRAFT_STORAGE_KEY = "recallfm:new-memory-draft";
 
 const FieldHelp = ({ label, help }: { label: string; help: string }) => (
   <Popover>
@@ -97,6 +121,7 @@ const FieldLabel = ({
 );
 
 const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) => {
+  const isEditing = Boolean(editingMemory);
   const { user } = useAuth();
   const [stage, setStage] = useState<FormStage>(editingMemory ? "form" : "ai");
   const [formStep, setFormStep] = useState<FormStep>(0);
@@ -129,10 +154,16 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const restoredDraftRef = useRef(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const dragRef = useRef<PanelDragState | null>(null);
+
+  const draftStorageKey = useMemo(() => {
+    if (!user?.id) return null;
+    return `${CREATE_DRAFT_STORAGE_KEY}:${user.id}`;
+  }, [user?.id]);
 
   // AI Fill returns plain mood names, so this maps them back to the app's emoji labels when possible.
   const normalizeMood = (mood: string) => {
@@ -371,6 +402,148 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
     setFormStep(0);
   };
 
+  const hasDraftableContent = useMemo(() => (
+    aiPrompt.trim().length > 0 ||
+    title.trim().length > 0 ||
+    description.trim().length > 0 ||
+    songTitle.trim().length > 0 ||
+    artist.trim().length > 0 ||
+    locationName.trim().length > 0 ||
+    selectedMoods.length > 0 ||
+    people.length > 0 ||
+    selectedTags.length > 0 ||
+    !isPublic ||
+    Boolean(imagePreview)
+  ), [
+    aiPrompt,
+    title,
+    description,
+    songTitle,
+    artist,
+    locationName,
+    selectedMoods,
+    people,
+    selectedTags,
+    isPublic,
+    imagePreview,
+  ]);
+
+  const clearLocalDraft = () => {
+    if (!draftStorageKey || typeof window === "undefined") return;
+    window.localStorage.removeItem(draftStorageKey);
+  };
+
+  useEffect(() => {
+    if (isEditing || !draftStorageKey || restoredDraftRef.current || typeof window === "undefined") return;
+
+    restoredDraftRef.current = true;
+    const rawDraft = window.localStorage.getItem(draftStorageKey);
+    if (!rawDraft) return;
+
+    try {
+      const draft = JSON.parse(rawDraft) as Partial<LocalDraft>;
+      if (draft.stage === "ai" || draft.stage === "form") setStage(draft.stage);
+      if (draft.formStep === 0 || draft.formStep === 1 || draft.formStep === 2) setFormStep(draft.formStep);
+      if (typeof draft.aiPrompt === "string") setAiPrompt(draft.aiPrompt);
+      if (typeof draft.title === "string") setTitle(draft.title.slice(0, 80));
+      if (typeof draft.description === "string") setDescription(draft.description);
+      if (typeof draft.songTitle === "string") setSongTitle(draft.songTitle);
+      if (typeof draft.artist === "string") setArtist(draft.artist);
+      if (typeof draft.memoryYear === "number") setMemoryYear(draft.memoryYear);
+      if (typeof draft.memorySeason === "string" && (MEMORY_SEASONS as readonly string[]).includes(draft.memorySeason)) {
+        setMemorySeason(draft.memorySeason);
+      }
+      if (typeof draft.locationName === "string") setLocationName(draft.locationName.slice(0, 120));
+      if (typeof draft.locationLat === "number" || draft.locationLat === null) setLocationLat(draft.locationLat ?? null);
+      if (typeof draft.locationLng === "number" || draft.locationLng === null) setLocationLng(draft.locationLng ?? null);
+      if (typeof draft.locationPlaceId === "string" || draft.locationPlaceId === null) setLocationPlaceId(draft.locationPlaceId ?? null);
+      if (Array.isArray(draft.selectedMoods)) {
+        setSelectedMoods(draft.selectedMoods.filter((mood): mood is string => typeof mood === "string").slice(0, 8));
+      }
+      if (Array.isArray(draft.people)) {
+        setPeople(draft.people.filter((person): person is string => typeof person === "string").slice(0, 8));
+      }
+      if (Array.isArray(draft.selectedTags)) {
+        setSelectedTags(draft.selectedTags.filter((tag): tag is string => typeof tag === "string").slice(0, 8));
+      }
+      if (typeof draft.isPublic === "boolean") setIsPublic(draft.isPublic);
+      if (typeof draft.imagePreview === "string" || draft.imagePreview === null) setImagePreview(draft.imagePreview ?? null);
+
+      toast.success("Restored your draft");
+    } catch (error) {
+      console.error(error);
+      window.localStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, isEditing]);
+
+  useEffect(() => {
+    if (isEditing || !draftStorageKey || typeof window === "undefined") return;
+
+    if (!hasDraftableContent) {
+      window.localStorage.removeItem(draftStorageKey);
+      return;
+    }
+
+    const draft: LocalDraft = {
+      savedAt: new Date().toISOString(),
+      stage,
+      formStep,
+      aiPrompt,
+      title,
+      description,
+      songTitle,
+      artist,
+      memoryYear,
+      memorySeason,
+      locationName,
+      locationLat,
+      locationLng,
+      locationPlaceId,
+      selectedMoods,
+      people,
+      selectedTags,
+      isPublic,
+      imagePreview: imagePreview?.startsWith("blob:") ? null : imagePreview,
+    };
+
+    window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+  }, [
+    draftStorageKey,
+    isEditing,
+    hasDraftableContent,
+    stage,
+    formStep,
+    aiPrompt,
+    title,
+    description,
+    songTitle,
+    artist,
+    memoryYear,
+    memorySeason,
+    locationName,
+    locationLat,
+    locationLng,
+    locationPlaceId,
+    selectedMoods,
+    people,
+    selectedTags,
+    isPublic,
+    imagePreview,
+  ]);
+
+  useEffect(() => {
+    if (isEditing || typeof window === "undefined") return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasDraftableContent) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasDraftableContent, isEditing]);
+
   const goToPreviousStep = () => {
     setFormStep((current) => (current === 0 ? 0 : ((current - 1) as FormStep)));
   };
@@ -415,6 +588,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
       tags: selectedTags,
     });
     if (saved) {
+      clearLocalDraft();
       onClose();
     }
   };
@@ -521,7 +695,11 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           <h2 className="font-display text-xl font-semibold">
             {editingMemory ? "Edit Memory" : stage === "ai" ? "Start a Memory" : "New Music Memory"}
           </h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground/70 bg-white text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
             <X size={20} />
           </button>
         </div>
@@ -678,7 +856,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
           <div>
             <FieldLabel
               label="Cover image"
-              help="Upload an image or generate one from the memory."
+              help="Upload an existing image from your device, or generate one from the memory."
             >
               <span className="flex items-center gap-1.5"><ImagePlus size={14} className="text-primary" /> Cover image</span>
             </FieldLabel>
@@ -705,8 +883,8 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
                   onClick={() => fileInputRef.current?.click()}
                   className="flex-1 h-20 rounded-lg border-2 border-dashed border-border bg-card flex flex-col items-center justify-center text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
                 >
-                  <ImagePlus size={18} />
-                  <span className="text-[10px] mt-1">Upload</span>
+                  <Upload size={18} />
+                  <span className="text-[10px] mt-1">Upload image</span>
                 </button>
                 <button
                   type="button"
@@ -721,7 +899,7 @@ const AddMemoryForm = ({ onAdd, onClose, editingMemory }: AddMemoryFormProps) =>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp"
               onChange={handleImageSelect}
               className="hidden"
             />

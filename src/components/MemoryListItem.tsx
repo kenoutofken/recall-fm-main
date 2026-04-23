@@ -11,7 +11,7 @@ interface MemoryListItemProps {
 const MemoryListItem = ({ memory, onClick }: MemoryListItemProps) => {
   return (
     <div
-      className="group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer"
+      className="card-strong group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer"
       onClick={() => onClick?.(memory)}
     >
       <div className="flex-1 min-w-0">

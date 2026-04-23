@@ -114,6 +114,9 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
     }, [side]);
 
     const canStartDrag = React.useCallback((event: React.PointerEvent<React.ElementRef<typeof SheetPrimitive.Content>>) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-sheet-close]")) return false;
+
       const rect = event.currentTarget.getBoundingClientRect();
 
       if (side === "left") return event.clientX >= rect.right - 72;
@@ -211,7 +214,8 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
           <SheetPrimitive.Close
             data-sheet-close
             ref={closeRef}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            onPointerDown={(event) => event.stopPropagation()}
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground/70 bg-white text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>

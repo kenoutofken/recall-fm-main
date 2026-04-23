@@ -38,9 +38,12 @@ const TimePeriodPicker = ({ dateFilter, onDateFilterChange }: TimePeriodPickerPr
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
-            variant={dateFilter ? "secondary" : "outline"}
+            variant="outline"
             size="sm"
-            className="gap-1.5"
+            className={cn(
+              "gap-1.5 rounded-full border-2 border-foreground/70 bg-white px-4 shadow-sm",
+              dateFilter && "border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+            )}
           >
             <Calendar size={14} />
             <span>{label}</span>
@@ -51,7 +54,7 @@ const TimePeriodPicker = ({ dateFilter, onDateFilterChange }: TimePeriodPickerPr
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => setViewYear((y) => y - 1)}
-              className="rounded-full p-1 text-muted-foreground hover:bg-muted transition-colors"
+              className="rounded-full border-2 border-foreground/70 bg-white p-1 text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               <ChevronLeft size={16} />
             </button>
@@ -59,7 +62,7 @@ const TimePeriodPicker = ({ dateFilter, onDateFilterChange }: TimePeriodPickerPr
             <button
               onClick={() => setViewYear((y) => y + 1)}
               disabled={viewYear >= currentYear}
-              className="rounded-full p-1 text-muted-foreground hover:bg-muted disabled:opacity-20 transition-colors"
+              className="rounded-full border-2 border-foreground/70 bg-white p-1 text-foreground shadow-sm transition-colors hover:bg-muted disabled:opacity-20"
             >
               <ChevronRight size={16} />
             </button>
@@ -80,12 +83,12 @@ const TimePeriodPicker = ({ dateFilter, onDateFilterChange }: TimePeriodPickerPr
                   onClick={() => !isFuture && handleSelect(idx)}
                   disabled={isFuture}
                   className={cn(
-                    "rounded-md py-2 text-xs font-medium transition-all",
+                    "rounded-md border-2 py-2 text-xs font-medium shadow-sm transition-all",
                     isSelected
-                      ? "bg-primary text-primary-foreground"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : isFuture
-                      ? "text-muted-foreground/30 cursor-default"
-                      : "bg-muted text-foreground hover:bg-primary/15"
+                      ? "border-border text-muted-foreground/30 cursor-default"
+                      : "border-foreground/70 bg-white text-foreground hover:bg-muted"
                   )}
                 >
                   {m}
@@ -98,7 +101,7 @@ const TimePeriodPicker = ({ dateFilter, onDateFilterChange }: TimePeriodPickerPr
           {dateFilter && (
             <button
               onClick={() => { onDateFilterChange(undefined); setOpen(false); }}
-              className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="mt-3 w-full rounded-full border-2 border-foreground/70 bg-white px-3 py-2 text-center text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               Reset to Latest
             </button>
@@ -107,7 +110,10 @@ const TimePeriodPicker = ({ dateFilter, onDateFilterChange }: TimePeriodPickerPr
       </Popover>
 
       {dateFilter && (
-        <button onClick={() => onDateFilterChange(undefined)} className="text-muted-foreground hover:text-foreground">
+        <button
+          onClick={() => onDateFilterChange(undefined)}
+          className="rounded-full border-2 border-foreground/70 bg-white p-1 text-foreground shadow-sm transition-colors hover:bg-muted"
+        >
           <X size={14} />
         </button>
       )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, Heart, Loader2, UserPlus } from "lucide-react";
+import { Bell, Heart, Loader2, Music, UserPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +22,7 @@ type OwnedMemorySummary = {
 
 type NotificationItem = {
   id: string;
-  type: "memory_like" | "follow";
+  type: "memory_like" | "follow" | "playlist_add";
   actorId: string | null;
   actorName: string;
   createdAt: string;
@@ -65,7 +65,11 @@ const NotificationButton = () => {
     }
 
     const rawNotifications = (data ?? [])
-      .filter((notification) => notification.type === "memory_like" || notification.type === "follow")
+      .filter((notification) =>
+        notification.type === "memory_like" ||
+        notification.type === "follow" ||
+        notification.type === "playlist_add"
+      )
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 40);
 
@@ -124,7 +128,7 @@ const NotificationButton = () => {
 
     setNotifications(rawNotifications.map((notification) => ({
       id: notification.id,
-      type: notification.type as "memory_like" | "follow",
+      type: notification.type as "memory_like" | "follow" | "playlist_add",
       actorId: notification.actor_id,
       actorName: notification.actor_id ? formatActorName(profilesById.get(notification.actor_id)) : "Someone",
       createdAt: notification.created_at,
@@ -258,15 +262,15 @@ const NotificationButton = () => {
         </PressableButton>
       </SheetTrigger>
       <SheetContent side="right" className="flex h-full w-[92vw] flex-col overflow-hidden p-0 sm:max-w-sm">
-        <SheetHeader className="border-b border-border px-5 pb-3 pt-5 text-left">
-          <div className="flex items-center justify-between gap-3 pr-8">
-            <SheetTitle className="font-display">Notifications</SheetTitle>
+        <SheetHeader className="border-b border-border px-5 pb-3 pt-5 pr-16 text-left">
+          <div className="flex min-h-10 items-center justify-between gap-3">
+            <SheetTitle className="min-w-0 font-display leading-none">Notifications</SheetTitle>
             {notifications.length > 0 && (
               <PressableButton
                 type="button"
                 onClick={clearNotifications}
                 disabled={clearing}
-                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                className="inline-flex h-8 shrink-0 items-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               >
                 {clearing ? "Clearing" : "Clear all"}
               </PressableButton>
@@ -276,19 +280,23 @@ const NotificationButton = () => {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card py-6 text-sm text-muted-foreground">
+            <div className="card-strong flex items-center justify-center gap-2 rounded-lg py-6 text-sm text-muted-foreground">
               <Loader2 size={16} className="animate-spin" />
               Loading notifications
             </div>
           ) : notifications.length === 0 ? (
-            <p className="rounded-lg border border-border bg-card px-3 py-4 text-center text-sm text-muted-foreground">
-              Likes and new followers will appear here.
+            <p className="card-strong rounded-lg px-3 py-4 text-center text-sm text-muted-foreground">
+              Likes, playlist saves, and new followers will appear here.
             </p>
           ) : (
             <div className="space-y-2">
               {notifications.map((notification) => {
                 const isUnread = !notification.readAt;
-                const Icon = notification.type === "memory_like" ? Heart : UserPlus;
+                const Icon = notification.type === "memory_like"
+                  ? Heart
+                  : notification.type === "playlist_add"
+                    ? Music
+                    : UserPlus;
                 const canFollowBack = (
                   notification.type === "follow" &&
                   Boolean(notification.actorId) &&
@@ -298,7 +306,7 @@ const NotificationButton = () => {
                   <div
                     key={notification.id}
                     className={cn(
-                      "flex w-full items-start gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors",
+                      "card-strong flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors",
                       notification.memory ? "hover:bg-muted" : "cursor-default",
                     )}
                     >
@@ -311,7 +319,11 @@ const NotificationButton = () => {
                       <span
                         className={cn(
                           "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                          notification.type === "memory_like" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+                          notification.type === "memory_like"
+                            ? "bg-destructive/10 text-destructive"
+                            : notification.type === "playlist_add"
+                              ? "bg-emerald-500/10 text-emerald-600"
+                              : "bg-primary/10 text-primary",
                         )}
                       >
                         <Icon size={16} />
@@ -319,11 +331,17 @@ const NotificationButton = () => {
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm leading-snug text-foreground">
                           <span className="font-medium">{notification.actorName}</span>{" "}
-                          {notification.type === "memory_like" ? "liked your memory" : "followed you"}
+                          {notification.type === "memory_like"
+                            ? "liked your memory"
+                            : notification.type === "playlist_add"
+                              ? "saved your song to their playlist"
+                              : "followed you"}
                         </span>
                         {notification.memory && (
                           <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                            {notification.memory.title}
+                            {notification.type === "playlist_add"
+                              ? `${notification.memory.songTitle} from ${notification.memory.title}`
+                              : notification.memory.title}
                           </span>
                         )}
                         <span className="mt-1 block text-xs text-muted-foreground">

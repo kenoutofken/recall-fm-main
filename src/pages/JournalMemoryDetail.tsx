@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Calendar, ChevronLeft, Heart, MapPin, Minus, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Heart, MapPin, Minus, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { motion } from "framer-motion";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import MiniPlayer from "@/components/MiniPlayer";
 import BrandMark from "@/components/BrandMark";
+import AppBreadcrumbs from "@/components/AppBreadcrumbs";
 import BottomNav from "@/components/BottomNav";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
@@ -24,7 +26,9 @@ type DetailLocationState = {
   from?: {
     pathname?: string;
     search?: string;
+    uiState?: unknown;
   };
+  restore?: unknown;
 };
 
 const JournalMemoryDetail = () => {
@@ -52,11 +56,33 @@ const JournalMemoryDetail = () => {
   const returnPath = locationState?.from?.pathname
     ? `${locationState.from.pathname}${locationState.from.search ?? ""}`
     : backPath;
+  const hasProfileReturn = Boolean(locationState?.from?.pathname === "/" && locationState.from.search?.includes("profile="));
+  const resolvedBackLabel = hasProfileReturn ? "Profile" : backLabel;
   const { likeCounts, userLikes, toggleLike } = useLikes(memory ? [memory.id] : []);
   const { songs, addSong, removeSong, isSongInPlaylist } = usePlaylist();
   const canEditMemory = Boolean(memory && (!isDiscoverDetail || memory.userId === user?.id));
   const isLiked = Boolean(memory && userLikes.has(memory.id));
   const isInPlaylist = Boolean(memory && isSongInPlaylist(memory.songTitle, memory.artist));
+  const navigateBackToSource = () => {
+    if (locationState?.from?.pathname && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(returnPath, {
+      state: locationState?.from?.uiState === undefined ? null : { restore: locationState.from.uiState },
+    });
+  };
+  const breadcrumbItems = [
+    {
+      label: isDiscoverDetail ? "Discover" : "Journal",
+      onClick: navigateBackToSource,
+    },
+    ...(hasProfileReturn ? [{ label: "Profile" }] : []),
+    { label: memory?.title ?? "Memory" },
+  ];
+  const toolbarButtonClassName =
+    "relative inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground/70 bg-card text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   useEffect(() => {
     if (!isDiscoverDetail || !id) {
@@ -216,55 +242,65 @@ const JournalMemoryDetail = () => {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 pb-24">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(returnPath)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ChevronLeft size={18} />
-            {backLabel}
-          </button>
+        <AppBreadcrumbs items={breadcrumbItems} />
 
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <motion.button
+            type="button"
+            onClick={navigateBackToSource}
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+            className={toolbarButtonClassName}
+            aria-label={`Back to ${resolvedBackLabel}`}
+          >
+            <ArrowLeft size={16} />
+          </motion.button>
           {isDiscoverDetail && memory && (
             <div className="flex items-center gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <motion.button
                     type="button"
                     onClick={handleToggleLike}
+                    whileHover={{ scale: 1.03, y: -1 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 28 }}
                     aria-label={isLiked ? "Unlike this memory" : "Like this memory"}
                     className={cn(
-                      "relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isLiked && "border-primary text-primary"
+                      toolbarButtonClassName,
+                      isLiked && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
                     )}
                   >
-                    <Heart size={18} className={isLiked ? "fill-primary" : ""} />
+                    <Heart size={18} className={isLiked ? "fill-current" : ""} />
                     {(likeCounts[memory.id] || 0) > 0 && (
                       <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
                         {likeCounts[memory.id]}
                       </span>
                     )}
-                  </button>
+                  </motion.button>
                 </TooltipTrigger>
                 <TooltipContent>{isLiked ? "Unlike" : "Like"}</TooltipContent>
               </Tooltip>
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <motion.button
                     type="button"
                     onClick={togglePlaylist}
+                    whileHover={{ scale: 1.03, y: -1 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 28 }}
                     aria-label={isInPlaylist ? "Remove from playlist" : "Add to playlist"}
                     className={cn(
-                      "inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      toolbarButtonClassName,
                       isInPlaylist
                         ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "border-border bg-card text-foreground hover:bg-muted"
+                        : undefined
                     )}
                   >
-                    {isInPlaylist ? <Minus size={18} /> : <Plus size={18} />}
-                  </button>
+                    {isInPlaylist ? <Minus size={18} className="fill-current" /> : <Plus size={18} />}
+                  </motion.button>
                 </TooltipTrigger>
                 <TooltipContent>{isInPlaylist ? "Remove from playlist" : "Add to playlist"}</TooltipContent>
               </Tooltip>
@@ -280,10 +316,10 @@ const JournalMemoryDetail = () => {
             <p className="text-sm text-muted-foreground mb-6">This memory may have been deleted.</p>
             <button
               type="button"
-              onClick={() => navigate(returnPath)}
+              onClick={navigateBackToSource}
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Back to {backLabel}
+              Back to {resolvedBackLabel}
             </button>
           </div>
         ) : (
@@ -324,7 +360,7 @@ const JournalMemoryDetail = () => {
 
             <MiniPlayer songTitle={memory.songTitle} artist={memory.artist} />
 
-            <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div className="card-strong space-y-3 rounded-lg p-4">
               <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                 <Calendar size={14} className="shrink-0" />
                 <span>{formatMemoryTime(memory)}</span>

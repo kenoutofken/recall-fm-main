@@ -12,12 +12,14 @@ import { usePlaylist } from "@/hooks/usePlaylist";
 import MiniPlayer from "@/components/MiniPlayer";
 import BottomNav from "@/components/BottomNav";
 import BrandMark from "@/components/BrandMark";
+import AppBreadcrumbs from "@/components/AppBreadcrumbs";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
+import MemoryDetailSheet from "@/components/MemoryDetailSheet";
 import { parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { motion, type PanInfo } from "framer-motion";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +39,11 @@ interface ProfileResult {
   displayName: string | null;
   avatarUrl: string | null;
 }
+
+type EngagementCounts = {
+  likes: number;
+  playlistAdds: number;
+};
 
 const MOOD_GRADIENTS: Record<string, string> = {
   Joyful: "bg-gradient-to-br from-amber-300 to-orange-400",
@@ -62,9 +69,28 @@ const getMoodParts = (mood: string) => (
     .filter(Boolean)
 );
 
+const getTrendingScore = (memory: Memory, engagement: EngagementCounts | undefined) => {
+  const likes = engagement?.likes ?? 0;
+  const playlistAdds = engagement?.playlistAdds ?? 0;
+  const ageInDays = Math.max(
+    0,
+    (Date.now() - new Date(memory.createdAt).getTime()) / (1000 * 60 * 60 * 24),
+  );
+  const freshnessBoost = Math.max(0, 10 - ageInDays) * 0.35;
+
+  return (likes * 1) + (playlistAdds * 2.5) + freshnessBoost;
+};
+
+const topControlButtonClassName =
+  "relative inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-foreground/70 bg-card text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+const topSearchInputClassName =
+  "h-11 rounded-full border-2 border-foreground/70 bg-card pl-10 pr-10 text-foreground shadow-sm placeholder:text-muted-foreground/80 focus-visible:ring-2 focus-visible:ring-ring";
+
 const Discover = () => {
   const { addMemory } = useMemories();
   const { user } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -79,6 +105,7 @@ const Discover = () => {
   const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const [showAISuggest, setShowAISuggest] = useState(false);
@@ -92,7 +119,47 @@ const Discover = () => {
   const [userResults, setUserResults] = useState<ProfileResult[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [followSavingId, setFollowSavingId] = useState<string | null>(null);
+  const [engagementByMemoryId, setEngagementByMemoryId] = useState<Record<string, EngagementCounts>>({});
   const isDraggingCardRef = useRef(false);
+
+  useEffect(() => {
+    const restore = (location.state as { restore?: {
+      searchQuery?: string;
+      selectedMoods?: string[];
+      selectedTags?: string[];
+      dateFilter?: string | null;
+      locationName?: string;
+      locationLat?: number | null;
+      locationLng?: number | null;
+      locationPlaceId?: string | null;
+      currentIndex?: number;
+      aiFilterIds?: string[] | null;
+      aiReason?: string;
+      feedMode?: FeedMode;
+      profileFilter?: { userId: string; username: string } | null;
+      scrollY?: number;
+    } } | null)?.restore;
+
+    if (!restore) return;
+
+    setSearchQuery(restore.searchQuery ?? "");
+    setSelectedMoods(Array.isArray(restore.selectedMoods) ? restore.selectedMoods : []);
+    setSelectedTags(Array.isArray(restore.selectedTags) ? restore.selectedTags : []);
+    setDateFilter(restore.dateFilter ? new Date(restore.dateFilter) : undefined);
+    setLocationName(restore.locationName ?? "");
+    setLocationLat(restore.locationLat ?? null);
+    setLocationLng(restore.locationLng ?? null);
+    setLocationPlaceId(restore.locationPlaceId ?? null);
+    setAiFilterIds(Array.isArray(restore.aiFilterIds) ? restore.aiFilterIds : restore.aiFilterIds ?? null);
+    setAiReason(restore.aiReason ?? "");
+    setFeedMode(restore.feedMode === "following" ? "following" : "community");
+    setProfileFilter(restore.profileFilter ?? null);
+    setCurrentIndex(typeof restore.currentIndex === "number" ? restore.currentIndex : 0);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: restore.scrollY ?? 0, behavior: "auto" });
+    });
+  }, [location.state]);
 
   // Tapping a creator filters the feed to that person's public memories and stores it in the URL.
   const showProfilePosts = (memory: Memory) => {
@@ -103,12 +170,17 @@ const Discover = () => {
   };
 
   const openMemoryDetail = (memory: Memory) => {
-    navigate(`/discover/memories/${memory.id}`);
+    setSelectedMemory(memory);
   };
 
   const clearProfileFilter = () => {
     setProfileFilter(null);
     setSearchParams({});
+  };
+
+  const showProfilePostsFromSheet = (memory: Memory) => {
+    setSelectedMemory(null);
+    showProfilePosts(memory);
   };
 
   const changeFeedMode = (nextMode: FeedMode) => {
@@ -237,9 +309,56 @@ const Discover = () => {
     setLoading(false);
   }, []);
 
+  const fetchEngagementCounts = useCallback(async (memoryIds: string[]) => {
+    if (memoryIds.length === 0) {
+      setEngagementByMemoryId({});
+      return;
+    }
+
+    const [likesResult, playlistResult] = await Promise.all([
+      supabase
+        .from("memory_likes")
+        .select("memory_id")
+        .in("memory_id", memoryIds),
+      supabase
+        .from("playlist_songs")
+        .select("memory_id")
+        .in("memory_id", memoryIds),
+    ]);
+
+    if (likesResult.error || playlistResult.error) {
+      console.error(likesResult.error ?? playlistResult.error);
+      return;
+    }
+
+    const nextCounts: Record<string, EngagementCounts> = {};
+
+    memoryIds.forEach((memoryId) => {
+      nextCounts[memoryId] = { likes: 0, playlistAdds: 0 };
+    });
+
+    (likesResult.data ?? []).forEach((like) => {
+      if (!like.memory_id) return;
+      nextCounts[like.memory_id] ??= { likes: 0, playlistAdds: 0 };
+      nextCounts[like.memory_id].likes += 1;
+    });
+
+    (playlistResult.data ?? []).forEach((entry) => {
+      if (!entry.memory_id) return;
+      nextCounts[entry.memory_id] ??= { likes: 0, playlistAdds: 0 };
+      nextCounts[entry.memory_id].playlistAdds += 1;
+    });
+
+    setEngagementByMemoryId(nextCounts);
+  }, []);
+
   useEffect(() => {
     fetchPublic();
   }, [fetchPublic]);
+
+  useEffect(() => {
+    fetchEngagementCounts(memories.map((memory) => memory.id));
+  }, [fetchEngagementCounts, memories]);
 
   useEffect(() => {
     const profileUserId = searchParams.get("profile");
@@ -276,12 +395,34 @@ const Discover = () => {
           fetchPublic();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "memory_likes",
+        },
+        () => {
+          fetchEngagementCounts(memories.map((memory) => memory.id));
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "playlist_songs",
+        },
+        () => {
+          fetchEngagementCounts(memories.map((memory) => memory.id));
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchPublic]);
+  }, [fetchEngagementCounts, fetchPublic, memories]);
 
   useEffect(() => {
     fetchFollowing();
@@ -457,8 +598,17 @@ const Discover = () => {
         placeId: locationPlaceId,
       }));
     }
+
+    if (!profileFilter && feedMode === "community" && aiFilterIds === null) {
+      result = [...result].sort((a, b) => {
+        const scoreDiff = getTrendingScore(b, engagementByMemoryId[b.id]) - getTrendingScore(a, engagementByMemoryId[a.id]);
+        if (scoreDiff !== 0) return scoreDiff;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+
     return result;
-  }, [memories, profileFilter, feedMode, followingIds, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, aiFilterIds]);
+  }, [memories, profileFilter, feedMode, followingIds, hasSearchQuery, trimmedSearchQuery, selectedMoods, selectedTags, dateFilter, locationName, locationLat, locationLng, locationPlaceId, aiFilterIds, engagementByMemoryId]);
 
   // Reset the swipe deck to the first card when the active feed changes.
   useEffect(() => {
@@ -526,6 +676,39 @@ const Discover = () => {
       </header>
 
       <main className="flex-1 min-h-0 max-w-lg mx-auto w-full px-4 py-4 pb-24 flex flex-col">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <AppBreadcrumbs items={[{ label: "Discover" }]} className="mb-0 min-w-0" />
+          {!profileFilter && (
+            <div className="grid shrink-0 grid-cols-2 rounded-full border border-border bg-card p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => changeFeedMode("community")}
+                title="Showing stories for everyone"
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                  feedMode === "community"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground hover:bg-muted"
+                )}
+              >
+                Everyone
+              </button>
+              <button
+                type="button"
+                onClick={() => changeFeedMode("following")}
+                title="Showing stories from people I've followed"
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                  feedMode === "following"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground hover:bg-muted"
+                )}
+              >
+                Following
+              </button>
+            </div>
+          )}
+        </div>
         {/* Search and Filter Button */}
         <div className="flex items-center gap-2 mb-4">
           <div className="relative flex-1">
@@ -534,7 +717,7 @@ const Discover = () => {
               placeholder="Quick search memories…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-10"
+              className={topSearchInputClassName}
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -542,29 +725,50 @@ const Discover = () => {
               </button>
             )}
           </div>
-          <Button
-            variant={aiFilterIds !== null ? "secondary" : "outline"}
-            size="icon"
+          <motion.button
+            type="button"
             onClick={() => setShowAISuggest(true)}
-            className={cn("shrink-0", aiFilterIds !== null ? "border-primary text-primary" : "border-primary/30 text-primary hover:bg-primary/10")}
-            title="AI Suggest"
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+            className={cn(
+              topControlButtonClassName,
+              "shrink-0",
+              (showAISuggest || aiFilterIds !== null) && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+            aria-label="AI suggest posts"
+            title="AI Suggest posts"
           >
             <Sparkles size={16} />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
+          </motion.button>
+          <motion.button
+            type="button"
             onClick={() => setShowUserSearch(true)}
-            className="shrink-0"
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+            className={cn(
+              topControlButtonClassName,
+              "shrink-0",
+              showUserSearch && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+            aria-label="Find followers and users"
             title="Find users"
           >
             <UserPlus size={16} />
-          </Button>
-          <Button
-            variant={showFilters ? "secondary" : "outline"}
-            size="icon"
+          </motion.button>
+          <motion.button
+            type="button"
             onClick={() => setShowFilters(true)}
-            className="relative shrink-0"
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+            className={cn(
+              topControlButtonClassName,
+              "shrink-0",
+              showFilters && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+            aria-label="Open filters"
           >
             <SlidersHorizontal size={16} />
             {(selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)) > 0 && (
@@ -572,37 +776,8 @@ const Discover = () => {
                 {selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0)}
               </span>
             )}
-          </Button>
+          </motion.button>
         </div>
-
-        {!profileFilter && (
-          <div className="mb-4 grid grid-cols-2 rounded-lg border border-border bg-card p-1">
-            <button
-              type="button"
-              onClick={() => changeFeedMode("community")}
-              className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                feedMode === "community"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              onClick={() => changeFeedMode("following")}
-              className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                feedMode === "following"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Following
-            </button>
-          </div>
-        )}
 
         {/* AI filter banner */}
         {aiFilterIds !== null && (
@@ -619,7 +794,7 @@ const Discover = () => {
         )}
 
         {profileFilter && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+          <div className="card-strong mb-3 flex items-center gap-2 rounded-lg px-3 py-2">
             <div className="flex-1 min-w-0">
               <p className="text-xs text-muted-foreground">Viewing profile</p>
               <p className="text-sm font-medium text-foreground truncate">@{profileFilter.username}</p>
@@ -669,7 +844,7 @@ const Discover = () => {
               return (
                 <div
                   key={mem.id}
-                  className="rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer"
+                  className="card-strong rounded-lg px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer"
                   onClick={() => openMemoryDetail(mem)}
                 >
                   <div className="flex items-center gap-3">
@@ -953,7 +1128,7 @@ const Discover = () => {
                 <p className="py-6 text-center text-sm text-muted-foreground">No users found.</p>
               ) : (
                 userResults.map((profile) => (
-                  <div key={profile.userId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                  <div key={profile.userId} className="card-strong flex items-center gap-3 rounded-lg px-3 py-2.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -1021,6 +1196,15 @@ const Discover = () => {
         onLocationChange={updateLocationFilter}
         onClearFilters={clearFilters}
         onSearchChange={setSearchQuery}
+      />
+      <MemoryDetailSheet
+        memory={selectedMemory}
+        open={Boolean(selectedMemory)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMemory(null);
+        }}
+        source="discover"
+        onShowProfile={showProfilePostsFromSheet}
       />
     </div>
   );

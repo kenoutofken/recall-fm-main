@@ -5,7 +5,9 @@ import { Flower, Leaf, Snowflake, Sun } from "lucide-react";
 import { Memory } from "@/types/memory";
 import MemoryCard from "@/components/MemoryCard";
 import MemoryListItem from "@/components/MemoryListItem";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { formatMemoryTime, seasonFromDate, yearFromDate } from "@/lib/memoryTime";
+import { cn } from "@/lib/utils";
 
 export type ViewMode = "cards" | "list" | "map";
 export type MemorySortMode = "newest" | "oldest" | "title" | "song" | "artist";
@@ -41,22 +43,42 @@ const getSeasonIcon = (memory: Memory) => {
   return Snowflake;
 };
 
+type TimelineGroup = {
+  key: string;
+  year: number;
+  season: string;
+  items: Memory[];
+};
+
+type TimelineYearGroup = {
+  year: number;
+  groups: TimelineGroup[];
+};
+
 interface TimelineProps {
   memories: Memory[];
   viewMode?: ViewMode;
   sortMode?: MemorySortMode;
+  detailState?: unknown;
+  onMemorySelect?: (memory: Memory) => void;
 }
 
-const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: TimelineProps) => {
+const Timeline = ({ memories, viewMode = "cards", sortMode = "newest", detailState, onMemorySelect }: TimelineProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const openMemoryDetail = (memory: Memory) => {
+    if (onMemorySelect) {
+      onMemorySelect(memory);
+      return;
+    }
+
     navigate(`/journal/memories/${memory.id}`, {
       state: {
         from: {
           pathname: location.pathname,
           search: location.search,
+          uiState: detailState,
         },
       },
     });
@@ -68,16 +90,36 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
 
   const grouped = useMemo(() => {
     // The timeline groups entries by the remembered season/year, falling back to the saved date.
-    const map = new Map<string, Memory[]>();
+    const map = new Map<string, TimelineGroup>();
     sorted.forEach((m) => {
       const year = m.memoryYear ?? yearFromDate(m.date);
       const season = m.memorySeason ?? seasonFromDate(m.date);
       const key = `${year}-${season}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(m);
+      if (!map.has(key)) {
+        map.set(key, { key, year, season, items: [] });
+      }
+      map.get(key)!.items.push(m);
     });
     return Array.from(map.entries());
   }, [sorted]);
+
+  const groupedByYear = useMemo(() => {
+    const map = new Map<number, TimelineYearGroup>();
+
+    grouped.forEach(([, group]) => {
+      if (!map.has(group.year)) {
+        map.set(group.year, { year: group.year, groups: [] });
+      }
+
+      map.get(group.year)!.groups.push(group);
+    });
+
+    return Array.from(map.values());
+  }, [grouped]);
+
+  const defaultOpenYears = useMemo(() => {
+    return groupedByYear.slice(0, 2).map((group) => String(group.year));
+  }, [groupedByYear]);
 
   if (viewMode === "list") {
     return (
@@ -115,55 +157,68 @@ const Timeline = ({ memories, viewMode = "cards", sortMode = "newest" }: Timelin
           No memories for this period.
         </p>
       ) : (
-        <div className="relative">
-          <div className="absolute left-[15px] top-0 bottom-0 w-px bg-primary/70" />
-
-          {grouped.map(([monthKey, items]) => {
-            const SeasonIcon = getSeasonIcon(items[0]);
-
-            return (
-              <div key={monthKey} className="mb-8">
-                <div className="relative flex items-center gap-3 mb-4">
-                  <div className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <SeasonIcon size={17} strokeWidth={2.4} aria-hidden="true" />
+        <Accordion
+          type="multiple"
+          defaultValue={defaultOpenYears}
+          className="space-y-3"
+        >
+          {groupedByYear.map((yearGroup) => (
+            <AccordionItem
+              key={yearGroup.year}
+              value={String(yearGroup.year)}
+              className="card-strong overflow-hidden rounded-3xl border-primary/35 bg-white/95 px-0 shadow-sm"
+            >
+              <AccordionTrigger className="px-5 py-4 text-left no-underline hover:no-underline">
+                <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold text-foreground">{yearGroup.year}</div>
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                      {yearGroup.groups.reduce((count, group) => count + group.items.length, 0)} memories
+                    </p>
                   </div>
-                  <h2 className="font-display text-base font-semibold text-foreground">
-                    {formatMemoryTime(items[0])}
-                    {items.length > 1 && (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
-                        ({items.length})
-                      </span>
-                    )}
-                  </h2>
                 </div>
+              </AccordionTrigger>
 
-                <div className={`pl-[38px] ${viewMode === "list" ? "space-y-1.5" : "space-y-4"}`}>
-                  {items.map((memory, i) => (
-                    <motion.div
-                      key={memory.id}
-                      initial={{ opacity: 0, x: -12 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true, margin: "-40px" }}
-                      transition={{ duration: 0.25, delay: i * 0.03 }}
-                    >
-                      <div className="relative">
-                        <div className={`absolute -left-[27px] ${viewMode === "list" ? "top-3" : "top-5"} h-2 w-2 rounded-full bg-primary`} />
-                        {viewMode === "list" ? (
-                          <MemoryListItem
-                            memory={memory}
-                            onClick={openMemoryDetail}
-                          />
-                        ) : (
-                          <MemoryCard memory={memory} onClick={openMemoryDetail} index={0} />
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
+              <AccordionContent className="px-5 pb-5 pt-0">
+                <div className="space-y-5 border-t border-primary/10 pt-4">
+                  {yearGroup.groups.map((group) => {
+                    const SeasonIcon = getSeasonIcon(group.items[0]);
+
+                    return (
+                      <section key={group.key} className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="inline-flex items-center gap-1.5 rounded-full border-2 border-foreground/70 bg-white px-3 py-1 text-xs font-semibold text-foreground shadow-sm">
+                            <SeasonIcon size={13} className="text-primary" strokeWidth={2.2} aria-hidden="true" />
+                            <span>{group.season}</span>
+                            {group.items.length > 1 && (
+                              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                                {group.items.length}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          {group.items.map((memory, i) => (
+                            <motion.div
+                              key={memory.id}
+                              initial={{ opacity: 0, y: 8 }}
+                              whileInView={{ opacity: 1, y: 0 }}
+                              viewport={{ once: true, margin: "-40px" }}
+                              transition={{ duration: 0.22, delay: i * 0.03 }}
+                            >
+                              <MemoryCard memory={memory} onClick={openMemoryDetail} index={0} />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       )}
 
     </div>

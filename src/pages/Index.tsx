@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 
 import { ArrowUpDown, Search, SlidersHorizontal, X, LayoutGrid, List, Map } from "lucide-react";
 import { useMemories } from "@/hooks/useMemories";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Memory, MEMORY_SEASONS } from "@/types/memory";
 import Timeline, { MemorySortMode, ViewMode, sortMemories } from "@/components/Timeline";
@@ -10,13 +10,16 @@ import AddMemoryForm from "@/components/AddMemoryForm";
 import MemoryMap from "@/components/MemoryMap";
 import BottomNav from "@/components/BottomNav";
 import BrandMark from "@/components/BrandMark";
+import AppBreadcrumbs from "@/components/AppBreadcrumbs";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
 import FilterDrawer from "@/components/FilterDrawer";
+import MemoryDetailSheet from "@/components/MemoryDetailSheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { matchesLocationFilter } from "@/lib/locationFilter";
 import { seasonFromDate, yearFromDate } from "@/lib/memoryTime";
@@ -68,12 +71,20 @@ const formatSeasonBucket = (bucket: number) => {
   return `${season} ${year}`;
 };
 
+const topControlButtonClassName =
+  "relative inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-foreground/70 bg-card text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+const topSearchInputClassName =
+  "h-11 rounded-full border-2 border-foreground/70 bg-card pl-10 pr-10 text-foreground shadow-sm placeholder:text-muted-foreground/80 focus-visible:ring-2 focus-visible:ring-ring";
+
 const Index = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { memories, loading, addMemory, updateMemory, deleteMemory } = useMemories();
   const [showForm, setShowForm] = useState(false);
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -163,6 +174,21 @@ const Index = () => {
     setShowForm(true);
   };
 
+  const openMemoryDetailSheet = (memory: Memory) => {
+    setSelectedMemory(memory);
+  };
+
+  const handleEditMemoryFromSheet = (memory: Memory) => {
+    setSelectedMemory(null);
+    setEditingMemory(memory);
+    setShowForm(true);
+  };
+
+  const handleDeleteMemoryFromSheet = async (memory: Memory) => {
+    await deleteMemory(memory.id);
+    setSelectedMemory((current) => (current?.id === memory.id ? null : current));
+  };
+
   const updateLocationFilter = (name: string, location?: LocationResult | null) => {
     setLocationName(name);
 
@@ -183,6 +209,46 @@ const Index = () => {
   const TIMELINE_POSTS_PER_PAGE = 10;
   const LIST_POSTS_PER_PAGE = 20;
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const restore = (location.state as { restore?: {
+      searchQuery?: string;
+      selectedMoods?: string[];
+      selectedTags?: string[];
+      dateFilter?: string | null;
+      locationName?: string;
+      locationLat?: number | null;
+      locationLng?: number | null;
+      locationPlaceId?: string | null;
+      viewMode?: ViewMode;
+      sortMode?: MemorySortMode;
+      timelineSeasonRange?: [number, number] | null;
+      page?: number;
+      scrollY?: number;
+    } } | null)?.restore;
+
+    if (!restore) return;
+
+    setSearchQuery(restore.searchQuery ?? "");
+    setSelectedMoods(Array.isArray(restore.selectedMoods) ? restore.selectedMoods : []);
+    setSelectedTags(Array.isArray(restore.selectedTags) ? restore.selectedTags : []);
+    setDateFilter(restore.dateFilter ? parseISO(restore.dateFilter) : undefined);
+    setLocationName(restore.locationName ?? "");
+    setLocationLat(restore.locationLat ?? null);
+    setLocationLng(restore.locationLng ?? null);
+    setLocationPlaceId(restore.locationPlaceId ?? null);
+
+    const nextViewMode = restore.viewMode ? parseViewMode(restore.viewMode) : viewMode;
+    const nextSortMode = restore.sortMode ? parseSortMode(restore.sortMode, nextViewMode) : sortMode;
+    setViewMode(nextViewMode);
+    setSortMode(nextSortMode);
+    setTimelineSeasonRange(restore.timelineSeasonRange ?? null);
+    setPage(typeof restore.page === "number" && restore.page > 0 ? restore.page : 1);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: restore.scrollY ?? 0, behavior: "auto" });
+    });
+  }, [location.state]);
 
   // Convert each memory into a season bucket so the range slider can filter by Spring/Summer/Fall/Winter.
   const timelineSeasonBounds = useMemo(() => {
@@ -297,6 +363,34 @@ const Index = () => {
   }, [memoriesPerPage, sortedFiltered, page]);
 
   const hasMorePages = paginatedMemories.length < sortedFiltered.length;
+  const detailState = useMemo(() => ({
+    searchQuery,
+    selectedMoods,
+    selectedTags,
+    dateFilter: dateFilter ? dateFilter.toISOString() : null,
+    locationName,
+    locationLat,
+    locationLng,
+    locationPlaceId,
+    viewMode,
+    sortMode,
+    timelineSeasonRange,
+    page,
+    scrollY: window.scrollY,
+  }), [
+    searchQuery,
+    selectedMoods,
+    selectedTags,
+    dateFilter,
+    locationName,
+    locationLat,
+    locationLng,
+    locationPlaceId,
+    viewMode,
+    sortMode,
+    timelineSeasonRange,
+    page,
+  ]);
 
   return (
     <div className="min-h-screen bg-background pt-16">
@@ -323,6 +417,50 @@ const Index = () => {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-6 pb-24">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <AppBreadcrumbs items={[{ label: "Journal" }]} className="mb-0 min-w-0" />
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-sm">
+            <button
+              onClick={() => selectViewMode("cards")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                viewMode === "cards"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground hover:bg-muted"
+              )}
+              aria-label="Timeline view"
+            >
+              <LayoutGrid size={14} />
+              <span>Timeline</span>
+            </button>
+            <button
+              onClick={() => selectViewMode("list")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                viewMode === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground hover:bg-muted"
+              )}
+              aria-label="List view"
+            >
+              <List size={14} />
+              <span>List</span>
+            </button>
+            <button
+              onClick={() => selectViewMode("map")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                viewMode === "map"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground hover:bg-muted"
+              )}
+              aria-label="Map view"
+            >
+              <Map size={14} />
+              <span>Map</span>
+            </button>
+          </div>
+        </div>
         <p className="text-sm text-muted-foreground mb-4">Your personal collection of song-linked memories.</p>
         <div className="flex items-center gap-2 mb-4">
           <div className="relative flex-1">
@@ -331,7 +469,7 @@ const Index = () => {
               placeholder="Quick search memories…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-10"
+              className={topSearchInputClassName}
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -339,41 +477,52 @@ const Index = () => {
               </button>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="relative shrink-0"
-                aria-label={`Sort memories by ${SORT_LABELS[sortMode]}`}
-              >
-                <ArrowUpDown size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={sortMode}
-                onValueChange={(value) => selectSortMode(value as MemorySortMode)}
-              >
-                <DropdownMenuRadioItem value="newest">Newest on top</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="oldest">Oldest on top</DropdownMenuRadioItem>
-                {viewMode === "list" && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioItem value="title">Memory name</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="song">Song name</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="artist">Artist name</DropdownMenuRadioItem>
-                  </>
-                )}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant={showFilters ? "secondary" : "outline"}
-            size="icon"
+          {viewMode !== "map" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.03, y: -1 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                  className={cn(topControlButtonClassName, "shrink-0")}
+                  aria-label={`Sort memories by ${SORT_LABELS[sortMode]}`}
+                >
+                  <ArrowUpDown size={16} />
+                </motion.button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={sortMode}
+                  onValueChange={(value) => selectSortMode(value as MemorySortMode)}
+                >
+                  <DropdownMenuRadioItem value="newest">Newest on top</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="oldest">Oldest on top</DropdownMenuRadioItem>
+                  {viewMode === "list" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioItem value="title">Memory name</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="song">Song name</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="artist">Artist name</DropdownMenuRadioItem>
+                    </>
+                  )}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <motion.button
+            type="button"
             onClick={() => setShowFilters(true)}
-            className="relative shrink-0"
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+            className={cn(
+              topControlButtonClassName,
+              "shrink-0",
+              showFilters && "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+            aria-label="Open filters"
           >
             <SlidersHorizontal size={16} />
             {activeFilterCount > 0 && (
@@ -381,7 +530,7 @@ const Index = () => {
                 {activeFilterCount}
               </span>
             )}
-          </Button>
+          </motion.button>
         </div>
 
         {loading ? (
@@ -406,88 +555,21 @@ const Index = () => {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4">
               <p className="text-sm text-muted-foreground">
                 {filtered.length} {filtered.length === 1 ? "memory" : "memories"} {hasActiveFilters ? "found" : "saved"}
               </p>
-              <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-1">
-                <button
-                  onClick={() => selectViewMode("cards")}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  )}
-                  aria-label="Timeline view"
-                >
-                  <LayoutGrid size={14} />
-                  <span>Timeline</span>
-                </button>
-                <button
-                  onClick={() => selectViewMode("list")}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  )}
-                  aria-label="List view"
-                >
-                  <List size={14} />
-                  <span>List</span>
-                </button>
-                <button
-                  onClick={() => selectViewMode("map")}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    viewMode === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  )}
-                  aria-label="Map view"
-                >
-                  <Map size={14} />
-                  <span>Map</span>
-                </button>
-              </div>
             </div>
-            {viewMode === "cards" && timelineSeasonBounds && timelineSliderValue && timelineSeasonBounds.min < timelineSeasonBounds.max && (
-              <div className="mb-4 rounded-lg border border-border bg-card px-4 py-3">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Timeline range</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatSeasonBucket(timelineSliderValue[0])} - {formatSeasonBucket(timelineSliderValue[1])}
-                    </p>
-                  </div>
-                  {timelineSeasonRangeActive && (
-                    <button
-                      type="button"
-                      onClick={() => setTimelineSeasonRange(null)}
-                      className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-                <Slider
-                  min={timelineSeasonBounds.min}
-                  max={timelineSeasonBounds.max}
-                  step={1}
-                  minStepsBetweenThumbs={1}
-                  value={timelineSliderValue}
-                  onValueChange={(value) => {
-                    if (value.length < 2 || !timelineSeasonBounds) return;
-                    const nextRange: [number, number] = [Math.min(value[0], value[1]), Math.max(value[0], value[1])];
-                    if (nextRange[0] <= timelineSeasonBounds.min && nextRange[1] >= timelineSeasonBounds.max) {
-                      setTimelineSeasonRange(null);
-                      return;
-                    }
-                    setTimelineSeasonRange(nextRange);
-                  }}
-                  aria-label="Timeline season range"
-                />
-              </div>
-            )}
             {viewMode === "map" ? (
-              <MemoryMap memories={sortedFiltered} />
+              <MemoryMap memories={filtered} detailState={detailState} onMemorySelect={openMemoryDetailSheet} />
             ) : (
-              <Timeline memories={paginatedMemories} viewMode={viewMode} sortMode={sortMode} />
+              <Timeline
+                memories={paginatedMemories}
+                viewMode={viewMode}
+                sortMode={sortMode}
+                detailState={detailState}
+                onMemorySelect={openMemoryDetailSheet}
+              />
             )}
             {viewMode !== "map" && hasMorePages && (
               <Button
@@ -519,6 +601,39 @@ const Index = () => {
         onLocationChange={updateLocationFilter}
         onClearFilters={clearFilters}
         onSearchChange={setSearchQuery}
+        timelineRangeLabel={
+          viewMode === "cards" && timelineSeasonBounds && timelineSliderValue && timelineSeasonBounds.min < timelineSeasonBounds.max
+            ? `${formatSeasonBucket(timelineSliderValue[0])} - ${formatSeasonBucket(timelineSliderValue[1])}`
+            : undefined
+        }
+        timelineRangeValue={
+          viewMode === "cards" && timelineSeasonBounds && timelineSliderValue && timelineSeasonBounds.min < timelineSeasonBounds.max
+            ? timelineSliderValue
+            : null
+        }
+        timelineRangeMin={viewMode === "cards" ? timelineSeasonBounds?.min : undefined}
+        timelineRangeMax={viewMode === "cards" ? timelineSeasonBounds?.max : undefined}
+        timelineRangeActive={timelineSeasonRangeActive}
+        onTimelineRangeChange={(nextRange) => {
+          if (!timelineSeasonBounds) return;
+          if (nextRange[0] <= timelineSeasonBounds.min && nextRange[1] >= timelineSeasonBounds.max) {
+            setTimelineSeasonRange(null);
+            return;
+          }
+          setTimelineSeasonRange(nextRange);
+        }}
+        onTimelineRangeReset={() => setTimelineSeasonRange(null)}
+      />
+
+      <MemoryDetailSheet
+        memory={selectedMemory}
+        open={Boolean(selectedMemory)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMemory(null);
+        }}
+        source="journal"
+        onEdit={handleEditMemoryFromSheet}
+        onDelete={handleDeleteMemoryFromSheet}
       />
 
       {showForm && (

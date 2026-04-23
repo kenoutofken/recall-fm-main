@@ -179,7 +179,7 @@ const LocationSearch = ({ value, onChange, maxLength = 120, menuPlacement = "bot
           if (suggestions.length > 0 || statusMessage) setOpen(true);
         }}
         placeholder="e.g. Stanley Park, Vancouver"
-        className="w-full rounded-lg border border-input bg-card px-3 py-2.5 pr-9 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="w-full rounded-lg border-2 border-foreground/70 bg-white px-3 py-2.5 pr-9 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
         maxLength={maxLength}
         autoComplete="off"
       />
@@ -188,7 +188,7 @@ const LocationSearch = ({ value, onChange, maxLength = 120, menuPlacement = "bot
       </div>
 
       {showMenu && (
-        <div className={`absolute left-0 right-0 z-50 overflow-hidden rounded-lg border border-border bg-popover shadow-lg ${menuPositionClass}`}>
+        <div className={`card-strong absolute left-0 right-0 z-50 overflow-hidden rounded-lg bg-popover shadow-lg ${menuPositionClass}`}>
           {loading && suggestions.length === 0 && (
             <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 size={14} className="animate-spin" />

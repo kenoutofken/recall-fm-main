@@ -1,9 +1,10 @@
-import { ChevronLeft, UserPlus } from "lucide-react";
+import { Bell, MapPin, PenSquare, Undo2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AddMemoryForm from "@/components/AddMemoryForm";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import BottomNav from "@/components/BottomNav";
 import BrandMark from "@/components/BrandMark";
+import AppBreadcrumbs from "@/components/AppBreadcrumbs";
 import NotificationButton from "@/components/NotificationButton";
 import UserAvatar from "@/components/UserAvatar";
 import { useMemories } from "@/hooks/useMemories";
@@ -43,35 +44,78 @@ const WhatsNew = () => {
       </header>
 
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-5 pb-24">
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronLeft size={18} />
-          Discover
-        </button>
+        <AppBreadcrumbs items={[{ label: "Discover", onClick: () => navigate("/") }, { label: "What's new" }]} />
 
         <div className="mb-5">
           <h1 className="font-display text-2xl font-semibold text-foreground">What's new</h1>
           <p className="mt-1 text-sm text-muted-foreground">New features and small improvements from LifePlayback.</p>
         </div>
 
-        <article className="rounded-lg border border-border bg-card px-4 py-4">
-          <div className="mb-3 flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <UserPlus size={18} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">Follow back from notifications</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">New feature</p>
+        <div className="space-y-3">
+          <article className="card-strong rounded-lg px-4 py-4">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <PenSquare size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Draft recovery for new memories</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">New feature</p>
+              </div>
             </div>
-          </div>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            We updated the app so when someone follows you, you can follow them back right from the notification.
-            It is now easier to keep up with friends who find you on LifePlayback.
-          </p>
-        </article>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              New memory drafts now save automatically while you write, so accidental taps or refreshes do not wipe out your post.
+              When you come back, your unfinished memory is restored for you.
+            </p>
+          </article>
+
+          <article className="card-strong rounded-lg px-4 py-4">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Undo2 size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Smarter back navigation</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Improvement</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Going back from a memory detail now remembers where you were first.
+              Filters, profile views, timeline position, and scroll state are restored instead of sending you back to a default screen.
+            </p>
+          </article>
+
+          <article className="card-strong rounded-lg px-4 py-4">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <MapPin size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Map now opens near your busiest area</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Improvement</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              The map no longer opens in empty ocean when your memories are spread far apart.
+              It now centers on the area with the highest concentration of pinned memories first.
+            </p>
+          </article>
+
+          <article className="card-strong rounded-lg px-4 py-4">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Bell size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Playlist save notifications</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">New feature</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              You can now get notified when someone saves a song from your memory to their playlist,
+              so your music picks get the credit they deserve.
+            </p>
+          </article>
+        </div>
       </main>
 
       <BottomNav onNewMemory={() => setShowForm(true)} />

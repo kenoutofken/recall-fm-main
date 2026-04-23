@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
 import BrandMark from "@/components/BrandMark";
+import AppBreadcrumbs from "@/components/AppBreadcrumbs";
 import UserAvatar from "@/components/UserAvatar";
 import AudioToggleButton from "@/components/AudioToggleButton";
 import NotificationButton from "@/components/NotificationButton";
@@ -31,17 +32,13 @@ const Playlist = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              className="rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <BrandMark />
-            </button>
-            <span className="text-muted-foreground/30">|</span>
-            <h1 className="font-display text-xl font-normal text-foreground">My Playlist</h1>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <BrandMark />
+          </button>
           <div className="flex items-center gap-2">
             <NotificationButton />
             <AudioToggleButton />
@@ -51,9 +48,10 @@ const Playlist = () => {
       </header>
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4 pb-24">
+        <AppBreadcrumbs items={[{ label: "Playlist" }]} />
         {/* Exports saved songs into a plain text format the external playlist-transfer tool can import. */}
         {songs.length > 0 && (
-          <div className="rounded-lg border border-border bg-card p-4 mb-4 space-y-4">
+          <div className="card-strong rounded-lg p-4 mb-4 space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <span className="text-lg">🎵</span>
@@ -128,7 +126,7 @@ const Playlist = () => {
               {songs.map((song, i) => (
                 <div
                   key={song.id}
-                  className="rounded-lg border border-border bg-card p-4 flex items-center gap-3"
+                  className="card-strong rounded-lg p-4 flex items-center gap-3"
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <span className="text-xs font-semibold text-primary">{i + 1}</span>

@@ -1,6 +1,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { SlidersHorizontal, X } from "lucide-react";
 import { MOODS, MEMORY_TYPES } from "@/types/memory";
 import TimePeriodPicker from "@/components/TimePeriodPicker";
@@ -21,6 +22,13 @@ interface FilterDrawerProps {
   onLocationChange: (value: string, location?: LocationResult | null) => void;
   onClearFilters: () => void;
   onSearchChange: (query: string) => void;
+  timelineRangeLabel?: string;
+  timelineRangeValue?: [number, number] | null;
+  timelineRangeMin?: number;
+  timelineRangeMax?: number;
+  timelineRangeActive?: boolean;
+  onTimelineRangeChange?: (value: [number, number]) => void;
+  onTimelineRangeReset?: () => void;
 }
 
 const FilterDrawer = ({
@@ -37,12 +45,19 @@ const FilterDrawer = ({
   onLocationChange,
   onClearFilters,
   onSearchChange,
+  timelineRangeLabel,
+  timelineRangeValue,
+  timelineRangeMin,
+  timelineRangeMax,
+  timelineRangeActive = false,
+  onTimelineRangeChange,
+  onTimelineRangeReset,
 }: FilterDrawerProps) => {
   const hasActiveFilters =
-    searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName;
+    searchQuery || selectedMoods.length > 0 || selectedTags.length > 0 || dateFilter || locationName || timelineRangeActive;
 
   const activeFilterCount =
-    selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0);
+    selectedMoods.length + selectedTags.length + (dateFilter ? 1 : 0) + (locationName ? 1 : 0) + (timelineRangeActive ? 1 : 0);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -72,7 +87,7 @@ const FilterDrawer = ({
                 placeholder="Search memories, songs, artists..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="w-full rounded-lg border-2 border-foreground/70 bg-white px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               />
               {searchQuery && (
                 <button
@@ -93,7 +108,7 @@ const FilterDrawer = ({
                 <button
                   type="button"
                   onClick={() => onLocationChange("", null)}
-                  className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  className="rounded-full border-2 border-foreground/70 bg-white px-2.5 py-1 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
                 >
                   Clear
                 </button>
@@ -114,8 +129,10 @@ const FilterDrawer = ({
                     key={mood.label}
                     variant={active ? "default" : "outline"}
                     className={cn(
-                      "cursor-pointer transition-colors text-sm py-1.5 px-3",
-                      active && "bg-primary text-primary-foreground"
+                      "cursor-pointer border-2 text-sm py-1.5 px-3 shadow-sm transition-colors",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-foreground/70 bg-white text-foreground hover:bg-muted"
                     )}
                     onClick={() => onToggleMood(label)}
                   >
@@ -137,8 +154,10 @@ const FilterDrawer = ({
                     key={tag}
                     variant={active ? "default" : "outline"}
                     className={cn(
-                      "cursor-pointer transition-colors text-sm py-1.5 px-3",
-                      active && "bg-primary text-primary-foreground"
+                      "cursor-pointer border-2 text-sm py-1.5 px-3 shadow-sm transition-colors",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-foreground/70 bg-white text-foreground hover:bg-muted"
                     )}
                     onClick={() => onToggleTag(tag)}
                   >
@@ -157,6 +176,40 @@ const FilterDrawer = ({
               onDateFilterChange={onDateFilterChange}
             />
           </div>
+
+          {timelineRangeValue && typeof timelineRangeMin === "number" && typeof timelineRangeMax === "number" && onTimelineRangeChange && (
+            <div className="card-strong rounded-2xl px-4 py-3">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Timeline range</p>
+                  {timelineRangeLabel && (
+                    <p className="text-xs text-muted-foreground">{timelineRangeLabel}</p>
+                  )}
+                </div>
+                {timelineRangeActive && onTimelineRangeReset && (
+                  <button
+                    type="button"
+                    onClick={onTimelineRangeReset}
+                    className="rounded-full border-2 border-foreground/70 bg-white px-2.5 py-1 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <Slider
+                min={timelineRangeMin}
+                max={timelineRangeMax}
+                step={1}
+                minStepsBetweenThumbs={1}
+                value={timelineRangeValue}
+                onValueChange={(value) => {
+                  if (value.length < 2) return;
+                  onTimelineRangeChange([Math.min(value[0], value[1]), Math.max(value[0], value[1])]);
+                }}
+                aria-label="Timeline season range"
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -165,11 +218,11 @@ const FilterDrawer = ({
             variant="ghost"
             onClick={onClearFilters}
             disabled={!hasActiveFilters}
-            className="text-muted-foreground"
+            className="rounded-full border-2 border-foreground/70 bg-white px-4 text-foreground shadow-sm hover:bg-muted hover:text-foreground"
           >
             Clear all
           </Button>
-          <Button onClick={() => onOpenChange(false)} className="flex-1">
+          <Button onClick={() => onOpenChange(false)} className="flex-1 rounded-full border-2 border-primary bg-primary shadow-sm">
             Show results
           </Button>
         </div>

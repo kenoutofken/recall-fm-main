@@ -248,7 +248,7 @@ const UserAvatar = () => {
     const isFollowing = followingIds.has(profile.userId);
 
     return (
-      <div key={profile.userId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+      <div key={profile.userId} className="card-strong flex items-center gap-3 rounded-lg px-3 py-2.5">
         <button type="button" onClick={() => openProfile(profile)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <Avatar className="h-9 w-9 shrink-0">
             <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
@@ -290,7 +290,7 @@ const UserAvatar = () => {
   };
 
   const renderFollowingRow = (profile: ProfileSummary) => (
-    <div key={profile.userId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+    <div key={profile.userId} className="card-strong flex items-center gap-3 rounded-lg px-3 py-2.5">
       <button type="button" onClick={() => openProfile(profile)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <Avatar className="h-9 w-9 shrink-0">
           <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
@@ -358,7 +358,7 @@ const UserAvatar = () => {
               style={{ transform: `translateX(-${stageIndex * 100}%)` }}
             >
               <div className={panelClass}>
-                <div className="rounded-lg border border-border bg-card px-3 py-3">
+                <div className="card-strong rounded-lg px-3 py-3">
                   <p className="truncate text-sm font-medium text-foreground">{displayName || username || user?.email}</p>
                   <p className="truncate text-xs text-muted-foreground">{username ? `@${username}` : user?.email}</p>
                 </div>
@@ -366,7 +366,7 @@ const UserAvatar = () => {
                 <PressableButton
                   type="button"
                   onClick={() => setStage("account")}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
+                  className="card-strong flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted"
                 >
                   <User size={18} className="shrink-0 text-primary" />
                   <span className="min-w-0 flex-1">
@@ -379,7 +379,7 @@ const UserAvatar = () => {
                 <PressableButton
                   type="button"
                   onClick={() => setStage("following")}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
+                  className="card-strong flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted"
                 >
                   <Users size={18} className="shrink-0 text-primary" />
                   <span className="min-w-0 flex-1">
@@ -392,7 +392,7 @@ const UserAvatar = () => {
                 <PressableButton
                   type="button"
                   onClick={openPlaylist}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
+                  className="card-strong flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted"
                 >
                   <ListMusic size={18} className="shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 text-sm font-medium text-foreground">My Playlist</span>
@@ -402,7 +402,7 @@ const UserAvatar = () => {
                 <PressableButton
                   type="button"
                   onClick={openWhatsNew}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-muted"
+                  className="card-strong flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted"
                 >
                   <Megaphone size={18} className="shrink-0 text-primary" />
                   <span className="min-w-0 flex-1">
@@ -415,7 +415,7 @@ const UserAvatar = () => {
                 <PressableButton
                   type="button"
                   onClick={signOut}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="card-strong flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <LogOut size={18} className="shrink-0" />
                   <span className="min-w-0 flex-1 text-sm font-medium">Sign out</span>
@@ -470,12 +470,12 @@ const UserAvatar = () => {
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground">Search results</p>
                     {userSearchLoading ? (
-                      <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card py-4 text-sm text-muted-foreground">
+                      <div className="card-strong flex items-center justify-center gap-2 rounded-lg py-4 text-sm text-muted-foreground">
                         <Loader2 size={16} className="animate-spin" />
                         Searching...
                       </div>
                     ) : userResults.length === 0 ? (
-                      <p className="rounded-lg border border-border bg-card px-3 py-4 text-center text-sm text-muted-foreground">
+                      <p className="card-strong rounded-lg px-3 py-4 text-center text-sm text-muted-foreground">
                         No users found.
                       </p>
                     ) : (
@@ -487,12 +487,12 @@ const UserAvatar = () => {
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">People you follow</p>
                   {followingLoading ? (
-                    <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card py-4 text-sm text-muted-foreground">
+                    <div className="card-strong flex items-center justify-center gap-2 rounded-lg py-4 text-sm text-muted-foreground">
                       <Loader2 size={16} className="animate-spin" />
                       Loading...
                     </div>
                   ) : following.length === 0 ? (
-                    <p className="rounded-lg border border-border bg-card px-3 py-4 text-center text-sm text-muted-foreground">
+                    <p className="card-strong rounded-lg px-3 py-4 text-center text-sm text-muted-foreground">
                       You are not following anyone yet.
                     </p>
                   ) : (

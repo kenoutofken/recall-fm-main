@@ -31,7 +31,7 @@ const MemoryCard = ({ memory, onClick }: MemoryCardProps) => {
   return (
     <div
       className={cn(
-        "group relative h-72 overflow-hidden rounded-lg border border-border bg-card text-white transition-all hover:shadow-md",
+        "card-strong group relative h-72 overflow-hidden rounded-lg text-white transition-all hover:shadow-md",
         onClick && "cursor-pointer"
       )}
       onClick={() => onClick?.(memory)}

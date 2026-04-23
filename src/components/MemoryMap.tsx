@@ -1,174 +1,101 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MapPin, Minus, Plus, RotateCcw } from "lucide-react";
+import Map, { Marker, NavigationControl, type MapRef, type MapStyle } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { Calendar, Heart, MapPin, Music } from "lucide-react";
 import { Memory } from "@/types/memory";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { formatMemoryTime } from "@/lib/memoryTime";
 
-const TILE_SIZE = 256;
-const MIN_ZOOM = 0;
-const MAX_ZOOM = 15;
-const DEFAULT_ZOOM = 11;
-const MAX_LATITUDE = 85.05112878;
+const DEFAULT_VIEW = {
+  longitude: -98.5795,
+  latitude: 39.8283,
+  zoom: 2.8,
+};
 
 type MemoryMapProps = {
   memories: Memory[];
+  detailState?: unknown;
+  onMemorySelect?: (memory: Memory) => void;
 };
 
 type MapPoint = {
   memory: Memory;
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
 };
 
-type LatLng = {
-  lat: number;
-  lng: number;
+type MemoryCluster = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  screenX: number;
+  screenY: number;
+  memories: Memory[];
 };
 
-type PixelPoint = {
-  x: number;
-  y: number;
+const CLUSTER_RADIUS = 58;
+const FOCUS_CLUSTER_DISTANCE_KM = 250;
+
+const blankMapStyle: MapStyle = {
+  version: 8,
+  sources: {},
+  layers: [
+    {
+      id: "background",
+      type: "background",
+      paint: {
+        "background-color": "hsl(var(--muted))",
+      },
+    },
+  ],
 };
 
-const clamp = (value: number, min: number, max: number) => Math.max(Math.min(value, max), min);
+const getGeoapifyStyle = (apiKey: string): MapStyle => ({
+  version: 8,
+  sources: {
+    geoapify: {
+      type: "raster",
+      tiles: [`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${apiKey}`],
+      tileSize: 256,
+      attribution: "&copy; OpenStreetMap contributors, &copy; Geoapify",
+    },
+  },
+  layers: [
+    {
+      id: "geoapify",
+      type: "raster",
+      source: "geoapify",
+    },
+  ],
+});
 
-const clampLatitude = (lat: number) => clamp(lat, -MAX_LATITUDE, MAX_LATITUDE);
+const toRadians = (value: number) => (value * Math.PI) / 180;
 
-const normalizeLongitude = (lng: number) => {
-  const normalized = ((lng + 180) % 360 + 360) % 360 - 180;
-  return normalized === -180 ? 180 : normalized;
+const getDistanceKm = (a: MapPoint, b: MapPoint) => {
+  const earthRadiusKm = 6371;
+  const latDelta = toRadians(b.latitude - a.latitude);
+  const lngDelta = toRadians(b.longitude - a.longitude);
+  const startLat = toRadians(a.latitude);
+  const endLat = toRadians(b.latitude);
+
+  const haversine = Math.sin(latDelta / 2) ** 2
+    + Math.cos(startLat) * Math.cos(endLat) * Math.sin(lngDelta / 2) ** 2;
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 };
 
-// Web Mercator projection converts lat/lng into tile pixels for the custom interactive map.
-const project = (lat: number, lng: number, zoom: number): PixelPoint => {
-  const scale = TILE_SIZE * 2 ** zoom;
-  const clampedLat = clampLatitude(lat);
-  const latRadians = (clampedLat * Math.PI) / 180;
-
-  return {
-    x: ((normalizeLongitude(lng) + 180) / 360) * scale,
-    y: (0.5 - Math.log((1 + Math.sin(latRadians)) / (1 - Math.sin(latRadians))) / (4 * Math.PI)) * scale,
-  };
-};
-
-const unproject = (point: PixelPoint, zoom: number): LatLng => {
-  const scale = TILE_SIZE * 2 ** zoom;
-  const lng = (point.x / scale) * 360 - 180;
-  const n = Math.PI - (2 * Math.PI * point.y) / scale;
-  const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
-
-  return {
-    lat: clampLatitude(lat),
-    lng: normalizeLongitude(lng),
-  };
-};
-
-const getLngSpan = (points: MapPoint[]) => {
-  // Longitudes wrap around the world, so this finds the smallest span even near the date line.
-  if (points.length === 1) {
-    return {
-      center: points[0].lng,
-      span: 0,
-      normalizedLons: [points[0].lng + 180],
-    };
-  }
-
-  const normalizedLons = points
-    .map((point) => normalizeLongitude(point.lng) + 180)
-    .sort((a, b) => a - b);
-  let largestGap = -1;
-  let largestGapIndex = 0;
-
-  for (let index = 0; index < normalizedLons.length; index += 1) {
-    const nextIndex = (index + 1) % normalizedLons.length;
-    const current = normalizedLons[index];
-    const next = nextIndex === 0 ? normalizedLons[0] + 360 : normalizedLons[nextIndex];
-    const gap = next - current;
-
-    if (gap > largestGap) {
-      largestGap = gap;
-      largestGapIndex = index;
-    }
-  }
-
-  const startIndex = (largestGapIndex + 1) % normalizedLons.length;
-  const start = normalizedLons[startIndex];
-  const end = normalizedLons[largestGapIndex] < start
-    ? normalizedLons[largestGapIndex] + 360
-    : normalizedLons[largestGapIndex];
-  const span = end - start;
-  const center = normalizeLongitude(((start + span / 2) % 360) - 180);
-
-  return { center, span, normalizedLons };
-};
-
-const getFittedViewport = (points: MapPoint[], width: number, height: number) => {
-  // Try zoom levels from closest to farthest until all pins fit comfortably inside the map.
-  const latitudes = points.map((point) => point.lat);
-  const lngSpan = getLngSpan(points);
-  const center = {
-    lat: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
-    lng: lngSpan.center,
-  };
-
-  if (points.length === 1) {
-    return { center, zoom: DEFAULT_ZOOM };
-  }
-
-  for (let zoom = MAX_ZOOM; zoom >= MIN_ZOOM; zoom -= 1) {
-    const projectedCenter = project(center.lat, center.lng, zoom);
-    const projected = points.map((point) => project(point.lat, point.lng, zoom));
-    const adjusted = projected.map((point) => {
-      const scale = TILE_SIZE * 2 ** zoom;
-      let x = point.x;
-
-      if (x - projectedCenter.x > scale / 2) x -= scale;
-      if (projectedCenter.x - x > scale / 2) x += scale;
-
-      return { x, y: point.y };
-    });
-    const xs = adjusted.map((point) => point.x);
-    const ys = adjusted.map((point) => point.y);
-    const spreadX = Math.max(...xs) - Math.min(...xs);
-    const spreadY = Math.max(...ys) - Math.min(...ys);
-
-    if (spreadX <= width * 0.68 && spreadY <= height * 0.68) {
-      return { center, zoom };
-    }
-  }
-
-  return { center, zoom: MIN_ZOOM };
-};
-
-const wrapTileX = (x: number, zoom: number) => {
-  const tileCount = 2 ** zoom;
-  return ((x % tileCount) + tileCount) % tileCount;
-};
-
-const MemoryMap = ({ memories }: MemoryMapProps) => {
+const MemoryMap = ({ memories, detailState, onMemorySelect }: MemoryMapProps) => {
   const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
   const navigate = useNavigate();
   const location = useLocation();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; centerPixels: PixelPoint } | null>(null);
-  const [size, setSize] = useState({ width: 480, height: 360 });
-  const [center, setCenter] = useState<LatLng>({ lat: 0, lng: 0 });
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const observer = new ResizeObserver(([entry]) => {
-      const nextWidth = Math.max(entry.contentRect.width, 1);
-      const nextHeight = Math.max(entry.contentRect.height, 1);
-      setSize({ width: nextWidth, height: nextHeight });
-    });
-
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, []);
+  const mapRef = useRef<MapRef | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [viewportTick, setViewportTick] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [selectedMemories, setSelectedMemories] = useState<Memory[]>([]);
 
   const points = useMemo(() => {
-    // Only memories saved with coordinates can become map pins.
     return memories
       .filter((memory): memory is Memory & { locationLat: number; locationLng: number } => (
         typeof memory.locationLat === "number" &&
@@ -176,138 +103,151 @@ const MemoryMap = ({ memories }: MemoryMapProps) => {
       ))
       .map((memory) => ({
         memory,
-        lat: memory.locationLat,
-        lng: memory.locationLng,
+        latitude: memory.locationLat,
+        longitude: memory.locationLng,
       }));
   }, [memories]);
 
   const pointSignature = useMemo(() => {
-    return points.map((point) => `${point.memory.id}:${point.lat}:${point.lng}`).join("|");
+    return points.map((point) => `${point.memory.id}:${point.latitude}:${point.longitude}`).join("|");
   }, [points]);
 
-  const fitToPins = useCallback(() => {
-    if (points.length === 0) return;
+  const mapStyle = useMemo(() => {
+    return apiKey ? getGeoapifyStyle(apiKey) : blankMapStyle;
+  }, [apiKey]);
 
-    const fitted = getFittedViewport(points, size.width, size.height);
-    setCenter(fitted.center);
-    setZoom(fitted.zoom);
-  }, [points, size.height, size.width]);
+  const clusters = useMemo(() => {
+    void viewportTick;
+    const map = mapRef.current;
+    if (!mapReady || !map) {
+      return points.map((point) => ({
+        id: point.memory.id,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        screenX: 0,
+        screenY: 0,
+        memories: [point.memory],
+      }));
+    }
+
+    const nextClusters: MemoryCluster[] = [];
+
+    points.forEach((point) => {
+      const screenPoint = map.project([point.longitude, point.latitude]);
+      const existingCluster = nextClusters.find((cluster) => {
+        const distance = Math.hypot(cluster.screenX - screenPoint.x, cluster.screenY - screenPoint.y);
+        return distance <= CLUSTER_RADIUS;
+      });
+
+      if (!existingCluster) {
+        nextClusters.push({
+          id: point.memory.id,
+          latitude: point.latitude,
+          longitude: point.longitude,
+          screenX: screenPoint.x,
+          screenY: screenPoint.y,
+          memories: [point.memory],
+        });
+        return;
+      }
+
+      const nextCount = existingCluster.memories.length + 1;
+      existingCluster.latitude = ((existingCluster.latitude * existingCluster.memories.length) + point.latitude) / nextCount;
+      existingCluster.longitude = ((existingCluster.longitude * existingCluster.memories.length) + point.longitude) / nextCount;
+      existingCluster.screenX = ((existingCluster.screenX * existingCluster.memories.length) + screenPoint.x) / nextCount;
+      existingCluster.screenY = ((existingCluster.screenY * existingCluster.memories.length) + screenPoint.y) / nextCount;
+      existingCluster.memories.push(point.memory);
+      existingCluster.id = existingCluster.memories.map((memory) => memory.id).join("-");
+    });
+
+    return nextClusters;
+  }, [mapReady, points, viewportTick]);
+
+  const focusPoints = useMemo(() => {
+    if (points.length <= 1) return points;
+
+    const geographicClusters: MapPoint[][] = [];
+
+    points.forEach((point) => {
+      const existingCluster = geographicClusters.find((cluster) =>
+        cluster.some((clusterPoint) => getDistanceKm(clusterPoint, point) <= FOCUS_CLUSTER_DISTANCE_KM)
+      );
+
+      if (existingCluster) {
+        existingCluster.push(point);
+        return;
+      }
+
+      geographicClusters.push([point]);
+    });
+
+    return geographicClusters.reduce((largestCluster, cluster) => (
+      cluster.length > largestCluster.length ? cluster : largestCluster
+    ), geographicClusters[0]);
+  }, [points]);
 
   useEffect(() => {
-    fitToPins();
-  }, [fitToPins, pointSignature]);
+    const map = mapRef.current;
+    if (!mapReady || !map || points.length === 0) return;
 
-  const changeZoom = (nextZoom: number) => {
-    setZoom(clamp(nextZoom, MIN_ZOOM, MAX_ZOOM));
-  };
-
-  const mapState = useMemo(() => {
-    if (points.length === 0) return null;
-
-    // Build only the tile images around the current center, which keeps panning lightweight.
-    const centerPixels = project(center.lat, center.lng, zoom);
-    const centerTile = {
-      x: Math.floor(centerPixels.x / TILE_SIZE),
-      y: Math.floor(centerPixels.y / TILE_SIZE),
-    };
-    const horizontalTiles = Math.ceil(size.width / TILE_SIZE / 2) + 1;
-    const verticalTiles = Math.ceil(size.height / TILE_SIZE / 2) + 1;
-
-    const tiles = [];
-    for (let xOffset = -horizontalTiles; xOffset <= horizontalTiles; xOffset += 1) {
-      for (let yOffset = -verticalTiles; yOffset <= verticalTiles; yOffset += 1) {
-        const tileX = centerTile.x + xOffset;
-        const tileY = centerTile.y + yOffset;
-        const tileCount = 2 ** zoom;
-        if (tileY < 0 || tileY >= tileCount) continue;
-
-        tiles.push({
-          key: `${tileX}:${tileY}`,
-          urlX: wrapTileX(tileX, zoom),
-          urlY: tileY,
-          left: size.width / 2 + tileX * TILE_SIZE - centerPixels.x,
-          top: size.height / 2 + tileY * TILE_SIZE - centerPixels.y,
-        });
-      }
-    }
-
-    return { centerPixels, tiles };
-  }, [center.lat, center.lng, points.length, size.height, size.width, zoom]);
-
-  const positionedPoints = useMemo(() => {
-    if (!mapState) return [];
-
-    // Nearby pins are spread in a small circle so overlapping memories stay clickable.
-    const basePoints = points.map((point) => {
-      const projected = project(point.lat, point.lng, zoom);
-      const scale = TILE_SIZE * 2 ** zoom;
-      let adjustedX = projected.x;
-
-      if (adjustedX - mapState.centerPixels.x > scale / 2) adjustedX -= scale;
-      if (mapState.centerPixels.x - adjustedX > scale / 2) adjustedX += scale;
-
-      return {
-        ...point,
-        left: size.width / 2 + adjustedX - mapState.centerPixels.x,
-        top: size.height / 2 + projected.y - mapState.centerPixels.y,
-      };
-    });
-    const groups = new Map<string, typeof basePoints>();
-
-    basePoints.forEach((point) => {
-      const key = `${Math.round(point.left / 36)}:${Math.round(point.top / 36)}`;
-      const group = groups.get(key) ?? [];
-      group.push(point);
-      groups.set(key, group);
-    });
-
-    return Array.from(groups.values()).flatMap((group) => {
-      if (group.length === 1) return group;
-
-      const radius = Math.min(46, 18 + group.length * 4);
-      return group.map((point, index) => {
-        const angle = (index / group.length) * Math.PI * 2 - Math.PI / 2;
-        return {
-          ...point,
-          left: point.left + Math.cos(angle) * radius,
-          top: point.top + Math.sin(angle) * radius,
-        };
+    if (points.length === 1) {
+      map.flyTo({
+        center: [points[0].longitude, points[0].latitude],
+        zoom: 11,
+        duration: 500,
       });
-    });
-  }, [mapState, points, size.height, size.width, zoom]);
-
-  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button")) return;
-
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      centerPixels: project(center.lat, center.lng, zoom),
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-
-    setCenter(unproject({
-      x: drag.centerPixels.x - (event.clientX - drag.startX),
-      y: drag.centerPixels.y - (event.clientY - drag.startY),
-    }, zoom));
-  };
-
-  const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
-      dragRef.current = null;
-      event.currentTarget.releasePointerCapture(event.pointerId);
+      window.setTimeout(() => setViewportTick((tick) => tick + 1), 550);
+      return;
     }
+
+    if (focusPoints.length === 1) {
+      map.flyTo({
+        center: [focusPoints[0].longitude, focusPoints[0].latitude],
+        zoom: 9,
+        duration: 500,
+      });
+      window.setTimeout(() => setViewportTick((tick) => tick + 1), 550);
+      return;
+    }
+
+    const longitudes = focusPoints.map((point) => point.longitude);
+    const latitudes = focusPoints.map((point) => point.latitude);
+
+    map.fitBounds(
+      [
+        [Math.min(...longitudes), Math.min(...latitudes)],
+        [Math.max(...longitudes), Math.max(...latitudes)],
+      ],
+      {
+        padding: 64,
+        maxZoom: 12,
+        duration: 500,
+      },
+    );
+    window.setTimeout(() => setViewportTick((tick) => tick + 1), 550);
+  }, [focusPoints, mapReady, pointSignature, points]);
+
+  const openClusterPanel = (memoriesInCluster: Memory[]) => {
+    setSelectedMemories(memoriesInCluster);
+    setPanelOpen(true);
   };
 
-  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    changeZoom(zoom + (event.deltaY < 0 ? 1 : -1));
+  const openMemory = (memory: Memory) => {
+    setPanelOpen(false);
+    if (onMemorySelect) {
+      onMemorySelect(memory);
+      return;
+    }
+
+    navigate(`/journal/memories/${memory.id}`, {
+      state: {
+        from: {
+          pathname: location.pathname,
+          search: location.search,
+          uiState: detailState,
+        },
+      },
+    });
   };
 
   if (points.length === 0) {
@@ -323,88 +263,100 @@ const MemoryMap = ({ memories }: MemoryMapProps) => {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="relative h-[420px] touch-none overflow-hidden rounded-lg border border-border bg-muted cursor-grab active:cursor-grabbing"
-      aria-label="Memory map"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onWheel={onWheel}
-    >
-      {mapState && apiKey ? (
-        mapState.tiles.map((tile) => (
-          <img
-            key={tile.key}
-            src={`https://maps.geoapify.com/v1/tile/osm-bright/${zoom}/${tile.urlX}/${tile.urlY}.png?apiKey=${apiKey}`}
-            alt=""
-            className="absolute h-64 w-64 select-none"
-            draggable={false}
-            style={{ left: tile.left, top: tile.top }}
-          />
-        ))
-      ) : (
-        <div className="absolute inset-0 bg-muted" />
-      )}
+    <>
+      <div className="relative h-[420px] overflow-hidden rounded-lg border border-border bg-muted">
+        <Map
+          ref={mapRef}
+          initialViewState={DEFAULT_VIEW}
+          mapStyle={mapStyle}
+          cooperativeGestures
+          dragRotate={false}
+          touchPitch={false}
+          minZoom={1}
+          maxZoom={16}
+          onLoad={() => {
+            setMapReady(true);
+            setViewportTick((tick) => tick + 1);
+          }}
+          onMoveEnd={() => setViewportTick((tick) => tick + 1)}
+          onZoomEnd={() => setViewportTick((tick) => tick + 1)}
+          style={{ width: "100%", height: "100%" }}
+          attributionControl={false}
+        >
+          <NavigationControl position="top-right" showCompass={false} visualizePitch={false} />
 
-      {positionedPoints.map((point, index) => (
-        <button
-          key={point.memory.id}
-          type="button"
-          onClick={() => navigate(`/journal/memories/${point.memory.id}`, {
-            state: {
-              from: {
-                pathname: location.pathname,
-                search: location.search,
-              },
-            },
-          })}
-          className="absolute -translate-x-1/2 -translate-y-full rounded-full bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-md ring-2 ring-background transition-all hover:scale-105 hover:bg-primary/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          style={{ left: point.left, top: point.top, zIndex: positionedPoints.length - index }}
-        >
-          <span className="flex items-center gap-1">
-            <MapPin size={13} />
-            <span className="max-w-28 truncate">{point.memory.title}</span>
-          </span>
-        </button>
-      ))}
+          {clusters.map((cluster) => (
+            <Marker
+              key={cluster.id}
+              longitude={cluster.longitude}
+              latitude={cluster.latitude}
+              anchor="center"
+            >
+              <button
+                type="button"
+                onClick={() => openClusterPanel(cluster.memories)}
+                className="group relative flex h-11 w-11 items-center justify-center rounded-full transition-all hover:-translate-y-0.5 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`${cluster.memories.length} ${cluster.memories.length === 1 ? "memory" : "memories"} in this area`}
+              >
+                <Heart
+                  size={42}
+                  fill="currentColor"
+                  strokeWidth={2.3}
+                  className="absolute inset-0 m-auto text-primary drop-shadow-md transition-colors group-hover:text-primary/90"
+                />
+                <span className="absolute left-1/2 top-[45%] z-10 flex h-4 min-w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center text-center text-[11px] font-bold leading-none text-primary-foreground">
+                  {cluster.memories.length}
+                </span>
+              </button>
+            </Marker>
+          ))}
+        </Map>
 
-      <div className="absolute right-3 top-3 z-[1000] flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
-        <button
-          type="button"
-          onClick={() => changeZoom(zoom + 1)}
-          className="flex h-9 w-9 items-center justify-center text-foreground hover:bg-muted disabled:opacity-40"
-          disabled={zoom >= MAX_ZOOM}
-          aria-label="Zoom in"
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={() => changeZoom(zoom - 1)}
-          className="flex h-9 w-9 items-center justify-center border-t border-border text-foreground hover:bg-muted disabled:opacity-40"
-          disabled={zoom <= MIN_ZOOM}
-          aria-label="Zoom out"
-        >
-          <Minus size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={fitToPins}
-          className="flex h-9 w-9 items-center justify-center border-t border-border text-foreground hover:bg-muted"
-          aria-label="Fit pins"
-        >
-          <RotateCcw size={15} />
-        </button>
+        {!apiKey && (
+          <div className="absolute bottom-3 left-3 right-3 z-10 rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
+            Add VITE_GEOAPIFY_API_KEY to .env and restart the dev server to load map tiles.
+          </div>
+        )}
       </div>
 
-      {!apiKey && (
-        <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-lg border border-border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm">
-          Add VITE_GEOAPIFY_API_KEY to .env and restart the dev server to load map tiles.
-        </div>
-      )}
-    </div>
+      <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
+        <SheetContent side="right" className="flex h-full w-[92vw] flex-col overflow-hidden p-0 sm:max-w-sm">
+          <SheetHeader className="border-b border-border px-5 pb-3 pt-5 text-left">
+            <SheetTitle className="font-display">
+              {selectedMemories.length === 1 ? "1 memory here" : `${selectedMemories.length} memories here`}
+            </SheetTitle>
+            <p className="text-sm text-muted-foreground">Songs and moments saved around this area.</p>
+          </SheetHeader>
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-5">
+            {selectedMemories.map((memory) => (
+              <button
+                key={memory.id}
+                type="button"
+                onClick={() => openMemory(memory)}
+                className="card-strong w-full rounded-lg border-2 border-foreground/70 bg-white px-3 py-3 text-left transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="block truncate text-sm font-semibold text-foreground">{memory.title}</span>
+                <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Music size={12} className="shrink-0" />
+                  <span className="truncate">{memory.songTitle} - {memory.artist}</span>
+                </span>
+                {memory.locationName && (
+                  <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MapPin size={12} className="shrink-0" />
+                    <span className="truncate">{memory.locationName}</span>
+                  </span>
+                )}
+                <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Calendar size={12} className="shrink-0" />
+                  <span>{formatMemoryTime(memory)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 };
 

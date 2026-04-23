@@ -1,4 +1,4 @@
-import { Heart } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type BrandMarkProps = {
@@ -8,11 +8,14 @@ type BrandMarkProps = {
 
 const BrandMark = ({ className, markOnly = false }: BrandMarkProps) => (
   <span
-    className={cn("inline-flex items-center gap-2 font-display font-bold text-foreground", className)}
-    aria-label={markOnly ? "LifePlayback" : undefined}
+    className={cn(
+      "inline-flex items-center gap-2 text-2xl font-black uppercase leading-none tracking-[0.04em] text-foreground [font-family:'Courier_New',Courier,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace]",
+      className,
+    )}
+    aria-label="LifePlayback"
   >
-    <Heart size={17} fill="currentColor" strokeWidth={0} className="shrink-0 text-primary" aria-hidden="true" />
-    {!markOnly && <span className="text-xl font-bold leading-none tracking-normal">LifePlayback</span>}
+    <Undo2 size={21} strokeWidth={3} className="shrink-0 -translate-y-px text-primary" aria-hidden="true" />
+    {!markOnly && <span>LP</span>}
   </span>
 );
 
